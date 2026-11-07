@@ -66,14 +66,14 @@ test("the agent is called with the user's Foundry token and both tokens forwarde
   assert.deepEqual(JSON.parse(String(sent?.body)), { input: messages, stream: true });
 });
 
-test("a tool call the agent ran is shown once, with its arguments and result, after the reply", async () => {
+test("a tool call the agent ran is shown once, as soon as it is reported, with its arguments and result", async () => {
   const events = await collect(foundryToAgUiEvents(fromArray(listTrips as ResponsesEvent[]), "run"));
 
   assert.deepEqual(events.map((event) => event.type), [
-    EventType.TEXT_MESSAGE_START, EventType.TEXT_MESSAGE_CONTENT, EventType.TEXT_MESSAGE_CONTENT, EventType.TEXT_MESSAGE_END,
     EventType.TOOL_CALL_START, EventType.TOOL_CALL_ARGS, EventType.TOOL_CALL_END, EventType.TOOL_CALL_RESULT,
+    EventType.TEXT_MESSAGE_START, EventType.TEXT_MESSAGE_CONTENT, EventType.TEXT_MESSAGE_CONTENT, EventType.TEXT_MESSAGE_END,
   ]);
-  const [start, args, , result] = events.slice(4);
+  const [start, args, , result] = events.slice(0, 4);
   assert.equal(field(start, "toolCallName"), "Contoso_Trips-list_trips");
   assert.equal(field(args, "delta"), "{}");
   assert.equal(field(result, "toolCallId"), "run-call_1");

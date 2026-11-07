@@ -28,13 +28,12 @@ export function streamFoundryAgent({
 }
 
 // The agent reports each tool call as a function_call item (its name and arguments), then a function_call_output item
-// with the same call_id (its result). As in the other modes, tool calls are shown after the assistant's reply, and
-// flushed before a failure is reported.
+// with the same call_id (its result). Unlike the gateway modes, tool calls are shown as soon as the agent reports them:
+// a hosted agent can take several seconds per tool (another agent over A2A), and the user sees its progress.
 export async function* foundryToAgUiEvents(
   events: AsyncIterable<ResponsesEvent>, idPrefix: string,
 ): AsyncGenerator<BaseEvent> {
   const id = (callId: string) => `${idPrefix}-${callId}`;
-  const toolEvents: BaseEvent[] = [];
   for await (const event of events) {
     const text = textEvent(event, idPrefix);
     if (text) {
@@ -44,32 +43,27 @@ export async function* foundryToAgUiEvents(
     const item = event.item;
     if (event.type === "response.output_item.done" && item?.type === "function_call" && item.call_id) {
       const toolCallId = id(item.call_id);
-      toolEvents.push(
-        { type: EventType.TOOL_CALL_START, toolCallId, toolCallName: item.name ?? "unknown tool" },
-        { type: EventType.TOOL_CALL_ARGS, toolCallId, delta: item.arguments || "{}" },
-        { type: EventType.TOOL_CALL_END, toolCallId },
-      );
+      yield { type: EventType.TOOL_CALL_START, toolCallId, toolCallName: item.name ?? "unknown tool" };
+      yield { type: EventType.TOOL_CALL_ARGS, toolCallId, delta: item.arguments || "{}" };
+      yield { type: EventType.TOOL_CALL_END, toolCallId };
       continue;
     }
     if (event.type === "response.output_item.done" && item?.type === "function_call_output" && item.call_id) {
-      toolEvents.push({
+      yield {
         type: EventType.TOOL_CALL_RESULT, role: "tool", messageId: id(`${item.call_id}-result`),
         toolCallId: id(item.call_id), content: encodeToolResult(toolOutcome(item)),
-      } as BaseEvent);
+      } as BaseEvent;
       continue;
     }
     switch (event.type) {
       case "response.completed":
-        yield* toolEvents.splice(0);
         if (event.response?.status !== "completed") throw new ChatError("gateway", "response_failed", failureMessage(event));
         return;
       case "response.failed":
       case "response.incomplete":
       case "error":
-        yield* toolEvents.splice(0);
         throw new ChatError("gateway", "response_failed", failureMessage(event));
     }
   }
-  yield* toolEvents.splice(0);
   throw new ChatError("gateway", "truncated_stream", "The agent closed the stream before the response was complete.");
 }
