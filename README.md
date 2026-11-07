@@ -45,6 +45,43 @@ flowchart LR
 
 ### Who acts on each call
 
+One turn, *"Please file the €220 dinner on my Paris trip"*:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Chat as Chat UI
+    participant TA as Travel assistant<br/>(hosted agent)
+    participant LL as LiteLLM
+    participant A365 as Agent 365
+    participant Trips as Trips MCP server
+    participant Policy as Expense policy agent<br/>(prompt agent)
+    participant Model as Foundry model
+
+    User->>Chat: Message (signed in: chat, gateway and Foundry tokens)
+    Chat->>TA: Responses, as the user<br/>+ the user's gateway and Foundry tokens (x-client-*)
+    TA->>LL: Model call (the travel assistant's key)
+    LL->>Model: LiteLLM's managed identity
+    Model-->>TA: Ask the policy, then file the expense
+    TA->>LL: A2A 1.0 SendMessage<br/>(the travel assistant's key + the user's Foundry token)
+    LL->>Policy: The user's Foundry token, passed on
+    Policy->>LL: Model call (the expense policy agent's key)
+    LL->>Model: LiteLLM's managed identity
+    Note over Policy: The code interpreter runs policy.py:<br/>4 x 90 = 360 EUR, within the policy
+    Policy-->>LL: Answer
+    LL-->>TA: Answer
+    TA->>LL: MCP tools/call add_expense<br/>(the travel assistant's key + the user's gateway token)
+    LL->>A365: Evaluate the call, On-Behalf-Of the user
+    A365-->>LL: Allow
+    LL->>Trips: The user's gateway token, passed on
+    Note over Trips: Checks the token, files the expense<br/>for this user only
+    Trips-->>LL: Expense filed
+    LL-->>TA: Expense filed
+    TA-->>Chat: Answer and tool calls, streamed
+    Chat-->>User: "Filed the €220 dinner on your Paris trip."
+```
+
 | Call | Credential | What the callee sees |
 |---|---|---|
 | Chat UI → travel assistant | The user's Foundry token, plus the user's gateway and Foundry tokens in `x-client-*` headers, which Foundry passes on to the agent | The signed-in user |
