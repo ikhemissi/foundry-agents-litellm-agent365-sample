@@ -7,7 +7,7 @@ This repository is a **sample**: a working, documented example of Microsoft Foun
 - **Travel assistant** (`agents/travel-assistant`): a Foundry **hosted** agent (Agent Framework). It acts **as the signed-in user** towards the trips MCP server (through LiteLLM) and the expense policy agent (A2A 1.0 through LiteLLM), and uses its own LiteLLM key for the model.
 - **Expense policy agent** (`agents/expense-policy`): a Foundry **prompt** agent, the A2A 1.0 target. Its policy is a skill in the open Agent Skills format (`skill/SKILL.md` as instructions, `skill/scripts/policy.py` run by the code interpreter, so every figure is computed by code). It uses its own LiteLLM key for its model and calls no MCP server. Deployed by `src/deploy_policy_agent.py`.
 - **Trips MCP server** (`services/trips-mcp`): Contoso's fictional trips, per user.
-- **LiteLLM** (`infra/litellm-gateway`, configured by `src/configure_gateway.py`): one key per agent, the trips MCP server (through an On-Behalf-Of exchange), the A2A agent, the Agent 365 guardrail on every MCP call (so every MCP call needs a user token).
+- **LiteLLM** (`infra/litellm-gateway`, configured by `src/configure_gateway.py`): one key per agent, the trips MCP server (the user's token passed on: `oauth_delegate`), the A2A agent, the Agent 365 guardrail on every MCP call (so every MCP call needs a user token).
 - **Agent 365** governs the MCP servers LiteLLM exposes (discovery, block and unblock, per tool) and evaluates each tool call as the user (guardrail).
 
 ## Rules

@@ -1,7 +1,8 @@
 # The trips MCP server: a container app (services/trips-mcp, deployed by azd) with each user's trips and expenses in
 # tables of its own storage account, reached with its managed identity. Internal ingress: only the apps of the
-# Container Apps environment reach it (LiteLLM). It also checks every request's user token: issued in this tenant,
-# for the trips API (TRIPS_API_AUDIENCE), with the delegated scope Trips.ReadWrite (services/trips-mcp/user_auth.py).
+# Container Apps environment reach it (LiteLLM). Every tool call must carry the user's token, which LiteLLM passes on:
+# issued in this tenant, for the gateway app (GATEWAY_AUDIENCE), with the delegated scope Tools.Use; discovery
+# (initialize, tools/list) needs none (services/trips-mcp/user_auth.py).
 
 data "azurerm_client_config" "current" {}
 
@@ -104,7 +105,12 @@ resource "azurerm_container_app" "trips" {
 
       env {
         name  = "TRIPS_AUTH_AUDIENCE"
-        value = var.trips_api_audience
+        value = var.gateway_audience
+      }
+
+      env {
+        name  = "TRIPS_AUTH_SCOPE"
+        value = "Tools.Use"
       }
 
       dynamic "readiness_probe" {

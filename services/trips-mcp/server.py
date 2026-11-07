@@ -1,5 +1,5 @@
 """Trips MCP server: the signed-in user's business trips (list_trips, get_trip) and a write tool (add_expense), over
-streamable HTTP at /mcp, stateless, meant to be called through LiteLLM with a token for the user (user_auth.py). The
+streamable HTTP at /mcp, stateless, meant to be called through LiteLLM with the user's token (user_auth.py). The
 tool logic is in trips.py; trips and expenses are in Azure Tables reached with the app's managed identity
 (AZURE_CLIENT_ID)."""
 
@@ -13,6 +13,7 @@ from azure.data.tables import TableClient, TableServiceClient
 from azure.identity import DefaultAzureCredential
 from mcp.server import MCPServer
 from mcp.server.mcpserver import Context
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -35,8 +36,11 @@ def table(name: str) -> TableClient:
 
 
 def signed_in(ctx: Context) -> trips.User:
-    """The user RequireUser validated for this request, logged with the application that called for them."""
+    """The user RequireUser validated for this request, logged with the application they signed in to. RequireUser
+    lets only discovery through without a user; this check keeps every tool closed even so."""
     state = ctx.request_context.request.state
+    if getattr(state, "user", None) is None:
+        raise ToolError("This tool acts for a signed-in user: call it with the user's token.")
     logger.info("user=%s via app=%s", state.user.object_id, state.calling_app)
     return state.user
 

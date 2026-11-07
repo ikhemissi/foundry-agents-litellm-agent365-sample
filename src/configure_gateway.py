@@ -2,8 +2,9 @@
 CLI sign-in (Key Vault Secrets Officer). Never prints a key. Run by the agents layer's postprovision hook, or:
     uv run python src/configure_gateway.py
 
-- The MCP server Contoso_Trips (the name Agent 365 shows): LiteLLM exchanges the caller's token for the gateway app
-  On-Behalf-Of the user (entra_obo) for a trips API token, and sends that to the trips MCP server.
+- The MCP server Contoso_Trips (the name Agent 365 shows): LiteLLM passes the caller's token for the gateway app on
+  to the trips MCP server unchanged (oauth_delegate); the server checks it and acts for that user. Agent 365 lists the
+  server's tools with its key only: the trips server answers discovery without a token.
 - The A2A agent expense_policy_agent: the Foundry prompt agent's A2A 1.0 endpoint; LiteLLM forwards the caller's
   Authorization header (the user's Foundry token) to it.
 - The Agent 365 guardrail (agent365), on for every MCP tool call: Agent 365 evaluates each call as the signed-in user,
@@ -43,21 +44,15 @@ def ensure_mcp_server(admin: Gateway, settings: dict) -> str:
     return server_id
 
 
-def trips_server(values: dict, gateway_secret: str) -> dict:
+def trips_server(values: dict) -> dict:
     return {
         "server_name": TRIPS_SERVER,
         "alias": TRIPS_SERVER,
         "description": "Contoso's business trips: the signed-in user's trips, and the expenses filed for them.",
         "url": values["TRIPS_MCP_URL"],
         "transport": "http",
-        "auth_type": "oauth2_token_exchange",
-        "token_exchange_profile": "entra_obo",
-        "token_exchange_endpoint": f"https://login.microsoftonline.com/{values['AZURE_TENANT_ID']}/oauth2/v2.0/token",
-        "credentials": {
-            "client_id": values["GATEWAY_CLIENT_ID"],
-            "client_secret": gateway_secret,
-            "scopes": [values["TRIPS_API_SCOPE"]],
-        },
+        "auth_type": "oauth_delegate",
+        "credentials": {},
     }
 
 
@@ -169,7 +164,7 @@ def main() -> None:
     admin = Gateway(values["LITELLM_URL"], admin_key)
     model = values["FOUNDRY_MODEL_DEPLOYMENT_NAME"]
 
-    trips_id = ensure_mcp_server(admin, trips_server(values, gateway_secret))
+    trips_id = ensure_mcp_server(admin, trips_server(values))
     policy_agent_id = ensure_a2a_agent(admin, values)
     ensure_guardrail(admin, values, gateway_secret)
     ensure_agent_key(

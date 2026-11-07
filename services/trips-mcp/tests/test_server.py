@@ -1,5 +1,5 @@
-"""The MCP endpoint as LiteLLM sees it: a user token is required, and the tools act for that user only. Tokens are
-signed here with a test key."""
+"""The MCP endpoint as LiteLLM sees it: discovery is open, every tool call needs the user's token (passed on by
+LiteLLM), and the tools act for that user only. Tokens are signed here with a test key."""
 
 import time
 
@@ -12,9 +12,9 @@ from starlette.testclient import TestClient
 from tests.fakes import FakeTable
 
 TENANT = "00000000-0000-4000-8000-000000000001"
-TRIPS_APP = "00000000-0000-4000-8000-000000000002"
-GATEWAY_APP = "00000000-0000-4000-8000-000000000003"
-ENV = {"TRIPS_AUTH_TENANT_ID": TENANT, "TRIPS_AUTH_AUDIENCE": f"api://{TRIPS_APP}"}
+GATEWAY_APP = "00000000-0000-4000-8000-000000000002"
+CHAT_APP = "00000000-0000-4000-8000-000000000003"
+ENV = {"TRIPS_AUTH_TENANT_ID": TENANT, "TRIPS_AUTH_AUDIENCE": f"api://{GATEWAY_APP}", "TRIPS_AUTH_SCOPE": "Tools.Use"}
 KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 HEADERS = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
 
@@ -22,14 +22,14 @@ HEADERS = {"Accept": "application/json, text/event-stream", "Content-Type": "app
 def token(key=KEY, **overrides):
     now = int(time.time())
     claims = {
-        "aud": TRIPS_APP,
+        "aud": GATEWAY_APP,
         "iss": f"https://login.microsoftonline.com/{TENANT}/v2.0",
         "iat": now,
         "exp": now + 600,
         "tid": TENANT,
         "oid": "alice",
-        "azp": GATEWAY_APP,
-        "scp": "Trips.ReadWrite",
+        "azp": CHAT_APP,
+        "scp": "Tools.Use",
         **overrides,
     }
     return jwt.encode({k: v for k, v in claims.items() if v is not None}, key, algorithm="RS256")
@@ -105,7 +105,7 @@ def test_invalid_arguments_return_a_tool_error(client):
         token(key=rsa.generate_private_key(public_exponent=65537, key_size=2048)),
         token(aud="api://another-app"),
         token(iss="https://login.microsoftonline.com/another-tenant/v2.0"),
-        token(scp=None, roles=["Trips.ReadWrite"]),
+        token(scp=None, roles=["Tools.Use"]),
         token(scp="User.Read"),
         token(exp=int(time.time()) - 60),
     ],
@@ -115,7 +115,36 @@ def test_anything_but_a_valid_user_token_gets_401(client, bearer):
     assert call_tool(client, "list_trips", bearer=bearer).status_code == 401
 
 
-def test_no_token_gets_401(client):
-    message = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
+def post(client, message, bearer=None):
+    headers = {**HEADERS, **({"Authorization": f"Bearer {bearer}"} if bearer else {})}
+    return client.post("/mcp", json=message, headers=headers)
 
-    assert client.post("/mcp", json=message, headers=HEADERS).status_code == 401
+
+INITIALIZE = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "1"}},
+}
+LIST_TOOLS = {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
+CALL_LIST_TRIPS = {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "list_trips", "arguments": {}}}
+
+
+def test_discovery_needs_no_token_so_that_governance_tools_can_list_the_tools(client):
+    assert post(client, INITIALIZE).status_code == 200
+
+    listed = post(client, LIST_TOOLS).json()["result"]["tools"]
+
+    assert {tool["name"] for tool in listed} == {"list_trips", "get_trip", "add_expense"}
+
+
+def test_a_tool_call_without_a_token_gets_401(client):
+    assert post(client, CALL_LIST_TRIPS).status_code == 401
+
+
+def test_a_batch_that_calls_a_tool_without_a_token_gets_401(client):
+    assert post(client, [LIST_TOOLS, CALL_LIST_TRIPS]).status_code == 401
+
+
+def test_discovery_with_an_invalid_token_gets_401(client):
+    assert post(client, LIST_TOOLS, bearer=token(aud="api://another-app")).status_code == 401

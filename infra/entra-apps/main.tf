@@ -1,16 +1,14 @@
-# The two app registrations behind the user's identity on the MCP path:
-# - the trips API: the audience of the tokens the trips MCP server accepts, with the delegated scope Trips.ReadWrite;
-# - the AI gateway (LiteLLM): callers send LiteLLM a user token for this app next to their LiteLLM key. LiteLLM
-#   exchanges it On-Behalf-Of the user, with this app's client secret, for an Agent 365 token (the agent_365
-#   guardrail evaluates each tool call as the user) and for a trips API token (sent to the trips MCP server).
-# Both exchanges need tenant-wide admin consent, granted here: provisioning this layer needs a Global Administrator or
-# a Privileged Role Administrator.
+# The AI gateway's app registration: the user's identity on the MCP path. Callers send LiteLLM a user token for this
+# app (scope Tools.Use) next to their LiteLLM key:
+# - LiteLLM passes it on unchanged to the trips MCP server (oauth_delegate), which checks it and acts for that user;
+# - LiteLLM's agent_365 guardrail exchanges it On-Behalf-Of the user, with this app's client secret, for an Agent 365
+#   token, so that Agent 365 evaluates each tool call as the user. That exchange needs tenant-wide admin consent,
+#   granted here: provisioning this layer needs a Global Administrator or a Privileged Role Administrator.
 
 data "azurerm_client_config" "current" {}
 
 locals {
   gateway_scope = "Tools.Use"
-  trips_scope   = "Trips.ReadWrite"
   # Microsoft's Agent 365 resource application and its delegated scope (LiteLLM's agent_365 guardrail).
   agent365_app_id  = "ea9ffc3e-8a23-4a7d-836d-234d7c7565c1"
   agent365_scope   = "ThreatProtection.Evaluate.All"
@@ -25,44 +23,7 @@ data "azuread_service_principal" "agent365" {
   client_id = local.agent365_app_id
 }
 
-resource "random_uuid" "trips_scope" {}
 resource "random_uuid" "gateway_scope" {}
-
-resource "azuread_application" "trips" {
-  display_name     = "Contoso trips API (${var.environment_name})"
-  sign_in_audience = "AzureADMyOrg"
-  owners           = [data.azurerm_client_config.current.object_id]
-
-  api {
-    requested_access_token_version = 2
-
-    oauth2_permission_scope {
-      id                         = random_uuid.trips_scope.result
-      value                      = local.trips_scope
-      type                       = "User"
-      enabled                    = true
-      admin_consent_display_name = "Read trips and file expenses"
-      admin_consent_description  = "Allows the application to read the signed-in user's trips and file expenses for them."
-      user_consent_display_name  = "Read your trips and file expenses"
-      user_consent_description   = "Allows the application to read your trips and file expenses for you."
-    }
-  }
-
-  lifecycle {
-    ignore_changes = [identifier_uris]
-  }
-}
-
-# api://<appId>: accepted by the tenant's default app management policy (custom URIs may be rejected).
-resource "azuread_application_identifier_uri" "trips" {
-  application_id = azuread_application.trips.id
-  identifier_uri = "api://${azuread_application.trips.client_id}"
-}
-
-resource "azuread_service_principal" "trips" {
-  client_id = azuread_application.trips.client_id
-  owners    = [data.azurerm_client_config.current.object_id]
-}
 
 resource "azuread_application" "gateway" {
   display_name     = "Contoso AI gateway (${var.environment_name})"
@@ -92,20 +53,13 @@ resource "azuread_application" "gateway" {
     }
   }
 
-  required_resource_access {
-    resource_app_id = azuread_application.trips.client_id
-    resource_access {
-      id   = random_uuid.trips_scope.result
-      type = "Scope"
-    }
-  }
-
   lifecycle {
     # The identifier URI and pre-authorized clients are managed by their own resources below.
     ignore_changes = [identifier_uris, api[0].known_client_applications]
   }
 }
 
+# api://<appId>: accepted by the tenant's default app management policy (custom URIs may be rejected).
 resource "azuread_application_identifier_uri" "gateway" {
   application_id = azuread_application.gateway.id
   identifier_uri = "api://${azuread_application.gateway.client_id}"
@@ -123,20 +77,15 @@ resource "azuread_application_pre_authorized" "clients" {
   permission_ids       = [random_uuid.gateway_scope.result]
 }
 
-# Tenant-wide admin consent for the gateway's two On-Behalf-Of exchanges.
+# Tenant-wide admin consent for the guardrail's On-Behalf-Of exchange.
 resource "azuread_service_principal_delegated_permission_grant" "agent365" {
   service_principal_object_id          = azuread_service_principal.gateway.object_id
   resource_service_principal_object_id = data.azuread_service_principal.agent365.object_id
   claim_values                         = [local.agent365_scope]
 }
 
-resource "azuread_service_principal_delegated_permission_grant" "trips" {
-  service_principal_object_id          = azuread_service_principal.gateway.object_id
-  resource_service_principal_object_id = azuread_service_principal.trips.object_id
-  claim_values                         = [local.trips_scope]
-}
 
-# Documented exception to passwordless: LiteLLM's On-Behalf-Of exchanges need a client secret. Kept in Key Vault (read
+# Documented exception to passwordless: LiteLLM's On-Behalf-Of exchange needs a client secret. Kept in Key Vault (read
 # by src/configure_gateway.py into LiteLLM's database) and in the Terraform state (Entra-protected); it expires after
 # a year, and provisioning this layer again after that renews it.
 resource "time_rotating" "gateway_secret" {

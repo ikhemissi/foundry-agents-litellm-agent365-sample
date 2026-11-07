@@ -47,13 +47,13 @@ variable "acr_pull_identity_id" {
   type        = string
 }
 
-variable "trips_api_audience" {
-  description = "The trips API's app ID URI (TRIPS_API_AUDIENCE, from the entra-apps layer): the audience of the user tokens the server accepts."
+variable "gateway_audience" {
+  description = "The gateway app's ID URI (GATEWAY_AUDIENCE, from the entra-apps layer): the audience of the user tokens the server accepts, which LiteLLM passes on."
   type        = string
 
   validation {
-    condition     = startswith(var.trips_api_audience, "api://")
-    error_message = "TRIPS_API_AUDIENCE is empty: provision the entra-apps layer first."
+    condition     = startswith(var.gateway_audience, "api://")
+    error_message = "GATEWAY_AUDIENCE is empty: provision the entra-apps layer first."
   }
 }
 
