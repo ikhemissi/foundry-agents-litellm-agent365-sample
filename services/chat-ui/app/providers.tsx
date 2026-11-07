@@ -8,7 +8,7 @@ import {
 } from "@azure/msal-browser";
 import { useMsal } from "@azure/msal-react";
 import { CopilotChat, CopilotKitCoreErrorCode, CopilotKitProvider } from "@copilotkit/react-core/v2";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toolCallRenderer } from "./tool-call";
 
 // The same id as the server's agent (lib/server/agent.ts).
@@ -42,6 +42,12 @@ export function SignedInChat({ scope, extraTokens }: { scope: string; extraToken
   const [extra, setExtra] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [session, setSession] = useState(0);
+  // The chat's thread id, new with each chat; in Foundry mode the server keeps the agent's session per thread.
+  const [threadId, setThreadId] = useState(() => crypto.randomUUID());
+  const startNewChat = () => {
+    setThreadId(crypto.randomUUID());
+    setSession((value) => value + 1);
+  };
   const refresh = useCallback(async () => {
     if (!account) return;
     try {
@@ -71,6 +77,19 @@ export function SignedInChat({ scope, extraTokens }: { scope: string; extraToken
   const headers = useMemo(() => ({ Authorization: `Bearer ${token}`, ...extra }), [token, extra]);
   // The server refuses chat requests without the extra tokens it asks for.
   const ready = Boolean(token) && extraTokens.every(({ header }) => Boolean(extra[header]));
+  // Foundry mode: as soon as a chat opens, ask the server to start the agent's session, so that its container is
+  // running by the first message. Once per thread; if it fails, the first message starts one.
+  const startsSessions = extraTokens.some(({ header }) => header === "x-foundry-token");
+  const sessionStarted = useRef("");
+  useEffect(() => {
+    if (!ready || !startsSessions || sessionStarted.current === threadId) return;
+    sessionStarted.current = threadId;
+    void fetch("/api/session", {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ threadId }),
+    }).catch(() => undefined);
+  }, [ready, startsSessions, threadId, headers]);
   const signIn = () => {
     // The extra scopes' consent is asked in the same popup: a second popup, opened after this one closes, is no longer
     // tied to the user's click and browsers block it (popup_window_error).
@@ -98,11 +117,11 @@ export function SignedInChat({ scope, extraTokens }: { scope: string; extraToken
     <section className="toolbar">
       <span>Signed in as <strong>{account.username}</strong></span>
       <span>
-        <button onClick={() => setSession((value) => value + 1)}>New chat</button>{" "}
+        <button onClick={startNewChat}>New chat</button>{" "}
         <button onClick={() => {
           setToken("");
           setExtra({});
-          setSession((value) => value + 1);
+          startNewChat();
           instance.logoutPopup({ account }).catch(() => setError("Sign-out could not be completed."));
         }}>Sign out</button>
       </span>
@@ -112,7 +131,7 @@ export function SignedInChat({ scope, extraTokens }: { scope: string; extraToken
       {/* A new key starts a new chat: history lives only in this page. */}
       <CopilotKitProvider key={`${account.homeAccountId}:${session}`}
         runtimeUrl="/api/copilotkit" agentId={agentId} headers={headers} renderToolCalls={renderToolCalls}>
-        <CopilotChat agentId={agentId} onError={(event) => {
+        <CopilotChat agentId={agentId} threadId={threadId} onError={(event) => {
           // The agent already shows its own errors (RUN_ERROR) as a chat message.
           if ("code" in event && event.code !== CopilotKitCoreErrorCode.AGENT_RUN_ERROR_EVENT) {
             setError(`The chat failed: ${event.error.message}`);

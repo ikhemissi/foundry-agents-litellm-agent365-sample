@@ -6,12 +6,33 @@ import { EventType, type BaseEvent } from "@ag-ui/client";
 import { encodeToolResult } from "../tool-result";
 import { responsesUrl, type FoundryConfig } from "./config";
 import { ChatError } from "./errors";
-import { rememberedSession, rememberSession } from "./foundry-sessions";
-import { streamResponses, type ChatMessage, type ResponsesEvent } from "./responses-stream";
+import { rememberSession, sessionFor } from "./foundry-sessions";
+import { refusal, streamResponses, type ChatMessage, type ResponsesEvent } from "./responses-stream";
 import { failureMessage, textEvent, toolOutcome } from "./responses-to-ag-ui";
 
+// Starts a session of the hosted agent as the user (its container starts now, so that the chat's first message finds
+// it running); returns its id.
+export async function createFoundrySession({
+  config, foundryToken, fetchImpl = fetch,
+}: {
+  config: FoundryConfig; foundryToken: string; fetchImpl?: typeof fetch;
+}): Promise<string> {
+  const url = `${config.GATEWAY_URL}/agents/${config.FOUNDRY_AGENT}/endpoint/sessions?api-version=v1`;
+  const response = await fetchImpl(url, {
+    method: "POST", redirect: "error", body: "{}",
+    headers: { Authorization: `Bearer ${foundryToken}`, "Content-Type": "application/json" },
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) throw await refusal(response);
+  const session = await response.json() as { agent_session_id?: unknown };
+  if (typeof session.agent_session_id !== "string" || !session.agent_session_id) {
+    throw new ChatError("gateway", "invalid_session", "Foundry did not return a session id.");
+  }
+  return session.agent_session_id;
+}
+
 // sessionKey: the user and the chat thread, whose hosted-agent session is reused (foundry-sessions.ts).
-export function streamFoundryAgent({
+export async function* streamFoundryAgent({
   config, messages, signal, foundryToken, gatewayToken, sessionKey, fetchImpl,
 }: {
   config: FoundryConfig; messages: ChatMessage[]; signal: AbortSignal; foundryToken: string; gatewayToken: string;
@@ -24,8 +45,8 @@ export function streamFoundryAgent({
     "Content-Type": "application/json",
   };
   // With the Responses protocol, the session goes in the body; Foundry returns it in x-agent-session-id.
-  const sessionId = rememberedSession(sessionKey);
-  return streamResponses({
+  const sessionId = await sessionFor(sessionKey);
+  yield* streamResponses({
     url: responsesUrl(config), model: config.CHAT_MODEL, headers, signal, fetchImpl,
     body: { input: messages, stream: true, ...(sessionId ? { agent_session_id: sessionId } : {}) },
     onResponseHeaders: (responseHeaders) => {

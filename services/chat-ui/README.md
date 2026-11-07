@@ -60,6 +60,7 @@ the app shows what LiteLLM reports. The team key stays on the server. With API M
 | `app/auth/callback/page.tsx` | Returns the sign-in popup's result to the page |
 | `app/api/copilotkit/[[...slug]]/route.ts` | The CopilotKit runtime endpoint |
 | `app/api/config/route.ts`, `app/api/health/route.ts` | Public settings (sign-in, title, intro); the container probe |
+| `app/api/session/route.ts`, `lib/server/session-handler.ts` | Foundry mode: starts the agent's session when a chat opens |
 | `lib/server/handler.ts` | Origin check, sign-in, 128 KiB body limit, request ids, runs the agent |
 | `lib/server/auth.ts` | Entra token validation: the sign-in token, the gateway token when `GATEWAY_SCOPE` is set, the Foundry token in Foundry mode |
 | `lib/server/agent.ts` | The `chat` agent: conversation in, AG-UI events out, errors as chat messages; picks the gateway |
@@ -195,8 +196,10 @@ own tools as the signed-in user. This server never calls the gateway.
 - The agent reports each tool call as a `function_call` item, then its `function_call_output`: each is shown as soon
   as it arrives (unlike the gateway modes, where tool lines follow the answer), since another agent over A2A can take
   several seconds.
-- A chat thread's later messages reuse the agent's session (`agent_session_id` in the request body; Foundry returns it
-  in `x-agent-session-id`), so they find the agent's container warm: a new session takes about 5–8 s to start. The
+- The agent's session is started as soon as a chat opens: the page sends the chat's thread id to `/api/session`
+  (same checks as the chat), which starts a session as the user (`POST …/agents/{agent}/endpoint/sessions`), so the
+  agent's container is running by the first message (a new session takes about 5–8 s to start). Every message of the
+  thread then reuses it (`agent_session_id` in the request body); a message sent while it starts waits for it. The
   server remembers one session per user and thread, in memory, for up to 15 minutes of inactivity
   (`lib/server/foundry-sessions.ts`).
 

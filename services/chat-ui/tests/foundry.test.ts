@@ -8,7 +8,10 @@ import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 import { verifyFoundryToken } from "../lib/server/auth";
 import { getConfig, publicConfig, responsesUrl, type FoundryConfig } from "../lib/server/config";
 import { foundryToAgUiEvents, streamFoundryAgent } from "../lib/server/foundry";
-import { forgetAllSessions, rememberedSession, rememberSession, sessionKey } from "../lib/server/foundry-sessions";
+import {
+  forgetAllSessions, rememberedSession, rememberSession, sessionFor, sessionKey, startSession,
+} from "../lib/server/foundry-sessions";
+import { handleSessionRequest } from "../lib/server/session-handler";
 import type { ResponsesEvent } from "../lib/server/responses-stream";
 import { decodeToolResult } from "../lib/tool-result";
 import { collect, environment, fromArray, id, streamResponse, type GatewayEvent } from "./helpers";
@@ -156,4 +159,62 @@ for (const [label, overrides, status] of [
 
 test("refuses a missing Foundry token (401)", async () => {
   await assert.rejects(verifyFoundryToken(null, signedInUser, config, getKey), (error: { status: number }) => error.status === 401);
+});
+
+test("a message that arrives while the chat's session starts waits for it instead of starting another", async () => {
+  forgetAllSessions();
+  let finishStarting: (id: string) => void = () => undefined;
+  void startSession("user:thread", () => new Promise<string>((resolve) => { finishStarting = resolve; }));
+
+  const waiting = sessionFor("user:thread");
+  finishStarting("session-1");
+
+  assert.equal(await waiting, "session-1");
+  assert.equal(rememberedSession("user:thread"), "session-1");
+});
+
+test("a session that fails to start is not remembered: the first message starts one", async () => {
+  forgetAllSessions();
+
+  await startSession("user:thread", () => Promise.reject(new Error("unavailable")));
+
+  assert.equal(await sessionFor("user:thread"), undefined);
+});
+
+// /api/session: the page asks for the agent's session when a chat opens.
+const threadId = "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b";
+function sessionRequest(body: unknown = { threadId }) {
+  return new Request("https://chat.example/api/session", {
+    method: "POST", body: JSON.stringify(body),
+    headers: { Authorization: "Bearer sign-in", "x-foundry-token": "foundry-token", "Content-Type": "application/json" },
+  });
+}
+const signedIn = {
+  config: () => config,
+  authenticate: async () => ({ oid: id(5), tid: id(1) }),
+  verifyFoundryToken: async (token: string | null) => token ?? "",
+};
+
+test("opening a chat starts the agent's session as the user, for that user and thread", async () => {
+  forgetAllSessions();
+  const calls: { url: string; authorization: string }[] = [];
+  const fetchImpl = (async (url: string, init: RequestInit) => {
+    calls.push({ url, authorization: (init.headers as Record<string, string>).Authorization });
+    return Response.json({ agent_session_id: "session-1", status: "active" });
+  }) as typeof fetch;
+
+  const response = await handleSessionRequest(sessionRequest(), { ...signedIn, fetchImpl });
+
+  assert.equal(response.status, 202);
+  assert.equal(await sessionFor(sessionKey(id(5), threadId)), "session-1");
+  assert.deepEqual(calls, [{
+    url: "https://contoso.services.ai.azure.com/api/projects/travel/agents/travel-assistant/endpoint/sessions?api-version=v1",
+    authorization: "Bearer foundry-token",
+  }]);
+});
+
+test("a session request without a thread id, or outside Foundry mode, is refused", async () => {
+  assert.equal((await handleSessionRequest(sessionRequest({ threadId: "not-a-uuid" }), signedIn)).status, 400);
+  const litellm = { ...signedIn, config: () => getConfig(environment) };
+  assert.equal((await handleSessionRequest(sessionRequest(), litellm)).status, 404);
 });
