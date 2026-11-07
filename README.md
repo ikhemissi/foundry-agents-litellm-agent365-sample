@@ -2,7 +2,7 @@
 
 ![Foundry agents with LiteLLM, governed by Agent 365: a chat talks to a Foundry hosted agent acting as the user, which reaches an MCP server and, over A2A 1.0, a Foundry prompt agent through a LiteLLM gateway that Agent 365 governs](docs/overview.svg)
 
-A working sample of two **Microsoft Foundry** agents that work together through a **LiteLLM** gateway, using open standards end to end, with **Microsoft Agent 365** governing the tools:
+A working sample of two **Microsoft Foundry** agents that work together through a **LiteLLM** gateway, using open protocols end to end, with **Microsoft Agent 365** governing the tools:
 
 - a **hosted agent** (Microsoft Agent Framework, Responses protocol) that acts **as the signed-in user**;
 - a **prompt agent** reached over **A2A 1.0**, whose policy is a skill in the open **Agent Skills** format, computed by code in the **code interpreter**;

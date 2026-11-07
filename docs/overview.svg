@@ -107,7 +107,7 @@
   <line x1="705" y1="194" x2="705" y2="221" stroke="#138a7a" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#arrow-teal)"/>
 
   <!-- Standards -->
-  <text class="footer" x="48" y="556" font-weight="700" fill="#1b1f3b">Open standards end to end</text>
+  <text class="footer" x="48" y="556" font-weight="700" fill="#1b1f3b">Open protocols and widely adopted APIs</text>
   <g>
     <rect x="48" y="572" width="74" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
     <text class="chip" x="85" y="594" text-anchor="middle">MCP</text>
@@ -115,14 +115,14 @@
     <text class="chip" x="178" y="594" text-anchor="middle">A2A 1.0</text>
     <rect x="234" y="572" width="82" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
     <text class="chip" x="275" y="594" text-anchor="middle">AG-UI</text>
-    <rect x="326" y="572" width="186" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
-    <text class="chip" x="419" y="594" text-anchor="middle">OpenAI Responses API</text>
-    <rect x="522" y="572" width="126" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
-    <text class="chip" x="585" y="594" text-anchor="middle">Agent Skills</text>
-    <rect x="658" y="572" width="138" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
-    <text class="chip" x="727" y="594" text-anchor="middle">OpenTelemetry</text>
-    <rect x="806" y="572" width="96" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
-    <text class="chip" x="854" y="594" text-anchor="middle">Entra ID</text>
+    <rect x="326" y="572" width="138" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
+    <text class="chip" x="395" y="594" text-anchor="middle">Responses API</text>
+    <rect x="474" y="572" width="126" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
+    <text class="chip" x="537" y="594" text-anchor="middle">Agent Skills</text>
+    <rect x="610" y="572" width="138" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
+    <text class="chip" x="679" y="594" text-anchor="middle">OpenTelemetry</text>
+    <rect x="758" y="572" width="228" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
+    <text class="chip" x="872" y="594" text-anchor="middle">OAuth 2.0 · OpenID Connect</text>
   </g>
   <text class="footer" x="48" y="642">The user's identity on every MCP and A2A call · one gateway key per agent · every MCP tool call evaluated by Agent 365</text>
 </svg>
