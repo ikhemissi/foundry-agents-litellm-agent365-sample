@@ -6,7 +6,7 @@ tool logic is in trips.py; trips and expenses are in Azure Tables reached with t
 import logging
 import os
 from functools import cache
-from typing import Any
+from typing import Any, Literal
 
 import trips
 from azure.data.tables import TableClient, TableServiceClient
@@ -63,13 +63,13 @@ def get_trip(ctx: Context, trip_id: str) -> dict[str, Any]:
 def add_expense(
     ctx: Context,
     trip_id: str,
-    category: str,
+    category: Literal["hotel", "meal", "transport", "other"],
     amount: float,
     description: str,
     currency: str = "EUR",
     attendees: int = 1,
 ) -> dict[str, Any]:
-    """trip_id: the trip's id from list_trips. category: hotel, meal, transport or other. amount: the total paid.
+    """trip_id: the trip's id from list_trips. category: a meal is "meal". amount: the total paid.
     description: what it was, at most 200 characters. attendees: how many people a meal was for."""
     arguments = {
         "trip_id": trip_id,
@@ -103,3 +103,5 @@ def create_app(env=os.environ, signing_key_for=None):
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+# The Azure SDK logs every storage request and response at INFO: keep the log to what the tools did.
+logging.getLogger("azure.core.pipeline.policies.http_logging_policy").setLevel(logging.WARNING)

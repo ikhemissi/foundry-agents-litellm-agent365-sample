@@ -3,10 +3,10 @@ Idempotent; reads the azd environment and uses your Azure CLI sign-in. Never pri
 postprovision hook, after src/configure_gateway.py (which creates the agent's LiteLLM key), or:
     uv run python src/deploy_policy_agent.py
 
-1. Two project connections hold the agent's own LiteLLM key, so that it never appears in the agent's definition:
-   - litellm (ModelGateway): the agent's model, as litellm/<model>;
-   - litellm-expense-policy (custom keys): the header x-litellm-api-key for the expense policy MCP server.
-2. The agent (agents/expense-policy/agent.json): a new version only when its definition changed.
+1. A project connection, litellm (ModelGateway), holds the agent's own LiteLLM key, so that it never appears in the
+   agent's definition; the agent's model is litellm/<model>.
+2. The agent (agents/expense-policy/agent.json, the policy in its instructions): a new version only when its
+   definition changed.
 3. Its endpoint: Responses and A2A, for Entra callers (the user's Foundry token, which LiteLLM passes on). Callers
    need the Foundry Agent Consumer role on the project (the agents layer gives it to the deployer).
 """
@@ -17,13 +17,12 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from configure_gateway import POLICY_AGENT_KEY_SECRET, POLICY_FOUNDRY_AGENT, POLICY_SERVER
+from configure_gateway import POLICY_AGENT_KEY_SECRET, POLICY_FOUNDRY_AGENT
 from gateway_admin import azd_values, read_secret
 
 ARM_API = "2025-04-01-preview"
 FOUNDRY_API = "v1"
 MODEL_CONNECTION = "litellm"
-MCP_CONNECTION = "litellm-expense-policy"
 DEFINITION_FILE = Path(__file__).parent.parent / "agents" / "expense-policy" / "agent.json"
 
 
@@ -44,7 +43,7 @@ def content_type(method: str) -> str:
     return "application/merge-patch+json" if method == "PATCH" else "application/json"
 
 
-def ensure_connections(values: dict, key: str) -> None:
+def ensure_model_connection(values: dict, key: str) -> None:
     project_name = values["FOUNDRY_PROJECT_ENDPOINT"].rstrip("/").rsplit("/", 1)[1]
     base = f"https://management.azure.com{values['FOUNDRY_ACCOUNT_ID']}/projects/{project_name}/connections"
     model = values["FOUNDRY_MODEL_DEPLOYMENT_NAME"]
@@ -64,19 +63,9 @@ def ensure_connections(values: dict, key: str) -> None:
             ),
         },
     }
-    mcp_connection = {
-        "category": "RemoteTool",
-        "target": f"{values['LITELLM_URL']}/mcp/{POLICY_SERVER}",
-        "authType": "CustomKeys",
-        "isSharedToAll": False,
-        "credentials": {"keys": {"x-litellm-api-key": key}},
-        "metadata": {"type": "custom_MCP"},
-    }
-    for name, properties in ((MODEL_CONNECTION, model_connection), (MCP_CONNECTION, mcp_connection)):
-        az_rest(
-            "PUT", f"{base}/{name}?api-version={ARM_API}", "https://management.azure.com", {"properties": properties}
-        )
-        print(f"Connection '{name}' set ({properties['category']})")
+    url = f"{base}/{MODEL_CONNECTION}?api-version={ARM_API}"
+    az_rest("PUT", url, "https://management.azure.com", {"properties": model_connection})
+    print(f"Connection '{MODEL_CONNECTION}' set (ModelGateway)")
 
 
 def desired_definition(values: dict) -> dict:
@@ -85,15 +74,6 @@ def desired_definition(values: dict) -> dict:
         "kind": "prompt",
         "model": f"{MODEL_CONNECTION}/{values['FOUNDRY_MODEL_DEPLOYMENT_NAME']}",
         "instructions": agent["instructions"],
-        "tools": [
-            {
-                "type": "mcp",
-                "server_label": POLICY_SERVER,
-                "server_url": f"{values['LITELLM_URL']}/mcp/{POLICY_SERVER}",
-                "require_approval": "never",
-                "project_connection_id": MCP_CONNECTION,
-            }
-        ],
     }
 
 
@@ -142,7 +122,7 @@ def main() -> None:
     key = read_secret(values["PLATFORM_KEY_VAULT_NAME"], POLICY_AGENT_KEY_SECRET)
     if not key:
         raise SystemExit("The expense policy agent's LiteLLM key is missing: run src/configure_gateway.py first.")
-    ensure_connections(values, key)
+    ensure_model_connection(values, key)
     ensure_agent(values)
     enable_a2a(values)
 

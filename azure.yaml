@@ -40,14 +40,10 @@ infra:
     - name: trips-mcp
       path: infra/trips-mcp
       dependsOn: [azure-platform, entra-apps]
-    # Contoso's expense policy; internal ingress (LiteLLM), no user data.
-    - name: expense-policy-mcp
-      path: infra/expense-policy-mcp
-      dependsOn: [azure-platform]
     # The deployer's Foundry Agent Consumer role; its hook configures LiteLLM and deploys the expense policy agent.
     - name: agents
       path: infra/agents
-      dependsOn: [foundry-model, litellm-gateway, entra-apps, trips-mcp, expense-policy-mcp]
+      dependsOn: [foundry-model, litellm-gateway, entra-apps, trips-mcp]
       hooks:
         postprovision:
           posix:
@@ -111,19 +107,6 @@ services:
         posix:
           shell: sh
           run: bash ../../infra/trips-mcp/hooks/postdeploy.sh
-  expense-policy-mcp:
-    project: ./services/expense-policy-mcp
-    language: python
-    host: containerapp
-    docker:
-      path: ./Dockerfile
-      # Images are built in the platform's registry: no local Docker needed to deploy.
-      remoteBuild: true
-    hooks:
-      postdeploy:
-        posix:
-          shell: sh
-          run: bash ../../infra/expense-policy-mcp/hooks/postdeploy.sh
   chat-ui:
     project: ./services/chat-ui
     language: ts

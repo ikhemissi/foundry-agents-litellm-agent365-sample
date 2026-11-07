@@ -2,16 +2,16 @@
 CLI sign-in (Key Vault Secrets Officer). Never prints a key. Run by the agents layer's postprovision hook, or:
     uv run python src/configure_gateway.py
 
-- MCP servers (the names Agent 365 shows):
-  - Contoso_Trips: LiteLLM exchanges the caller's token for the gateway app On-Behalf-Of the user (entra_obo) for a
-    trips API token, and sends that to the trips MCP server;
-  - Contoso_Expense_Policy: no credential upstream (internal ingress, no user data).
+- The MCP server Contoso_Trips (the name Agent 365 shows): LiteLLM exchanges the caller's token for the gateway app
+  On-Behalf-Of the user (entra_obo) for a trips API token, and sends that to the trips MCP server.
 - The A2A agent expense_policy_agent: the Foundry prompt agent's A2A 1.0 endpoint; LiteLLM forwards the caller's
   Authorization header (the user's Foundry token) to it.
-- The Agent 365 guardrail (agent365): evaluates MCP tool calls as the user, for the keys that list it.
+- The Agent 365 guardrail (agent365), on for every MCP tool call: Agent 365 evaluates each call as the signed-in user,
+  so every MCP call through LiteLLM must carry a user token (LiteLLM's open-source edition applies guardrails to all
+  keys alike).
 - One key per agent, in Key Vault, limited to what that agent uses:
-  - travel-assistant: the model, Contoso_Trips, expense_policy_agent, and the guardrail;
-  - expense-policy: the model and Contoso_Expense_Policy.
+  - travel-assistant: the model, Contoso_Trips and expense_policy_agent;
+  - expense-policy: the model only.
 - The proxy_admin user Agent 365 connects as, and its key (agent365-gateway-key).
 """
 
@@ -20,7 +20,6 @@ import os
 from gateway_admin import Gateway, azd_values, read_secret, store_secret
 
 TRIPS_SERVER = "Contoso_Trips"
-POLICY_SERVER = "Contoso_Expense_Policy"
 POLICY_A2A_AGENT = "expense_policy_agent"
 POLICY_FOUNDRY_AGENT = "expense-policy"
 GUARDRAIL = "agent365"
@@ -59,17 +58,6 @@ def trips_server(values: dict, gateway_secret: str) -> dict:
             "client_secret": gateway_secret,
             "scopes": [values["TRIPS_API_SCOPE"]],
         },
-    }
-
-
-def policy_server(values: dict) -> dict:
-    return {
-        "server_name": POLICY_SERVER,
-        "alias": POLICY_SERVER,
-        "description": "Contoso's travel expense policy: the rules, and a check of one expense against them.",
-        "url": values["EXPENSE_POLICY_MCP_URL"],
-        "transport": "http",
-        "auth_type": "none",
     }
 
 
@@ -112,14 +100,14 @@ def ensure_a2a_agent(admin: Gateway, values: dict) -> str:
 
 
 def ensure_guardrail(admin: Gateway, values: dict, gateway_secret: str) -> None:
-    """The Agent 365 guardrail, on for the keys that list it only (default_on off): the expense policy agent's calls
-    carry no user token, which the guardrail needs."""
+    """The Agent 365 guardrail, on for every MCP tool call (default_on); fail_closed blocks tool calls when Agent 365
+    cannot be reached."""
     settings = {
         "guardrail_name": GUARDRAIL,
         "litellm_params": {
             "guardrail": "agent_365",
             "mode": "pre_mcp_call",
-            "default_on": False,
+            "default_on": True,
             "tenant_id": values["AZURE_TENANT_ID"],
             "client_id": values["GATEWAY_CLIENT_ID"],
             "client_secret": gateway_secret,
@@ -127,7 +115,8 @@ def ensure_guardrail(admin: Gateway, values: dict, gateway_secret: str) -> None:
         },
         "guardrail_info": {"description": "Agent 365 evaluation of MCP tool calls, as the signed-in user."},
     }
-    listed = admin.call("GET", "/guardrails/list").get("guardrails", [])
+    # /v2/guardrails/list includes the guardrails kept in the database (/guardrails/list does not).
+    listed = admin.call("GET", "/v2/guardrails/list").get("guardrails", [])
     existing = [guardrail for guardrail in listed if guardrail.get("guardrail_name") == GUARDRAIL]
     if existing:
         admin.call("PUT", f"/guardrails/{existing[0]['guardrail_id']}", {"guardrail": settings})
@@ -138,7 +127,7 @@ def ensure_guardrail(admin: Gateway, values: dict, gateway_secret: str) -> None:
 
 
 def ensure_agent_key(admin: Gateway, vault: str, secret_name: str, settings: dict) -> None:
-    """An agent's key with exactly the given models, MCP servers, agents and guardrails; kept in Key Vault."""
+    """An agent's key with exactly the given models, MCP servers and agents; kept in Key Vault."""
     key = read_secret(vault, secret_name)
     if key:
         admin.call("POST", "/key/update", {"key": key, **settings})
@@ -181,7 +170,6 @@ def main() -> None:
     model = values["FOUNDRY_MODEL_DEPLOYMENT_NAME"]
 
     trips_id = ensure_mcp_server(admin, trips_server(values, gateway_secret))
-    policy_id = ensure_mcp_server(admin, policy_server(values))
     policy_agent_id = ensure_a2a_agent(admin, values)
     ensure_guardrail(admin, values, gateway_secret)
     ensure_agent_key(
@@ -192,14 +180,13 @@ def main() -> None:
             "key_alias": "travel-assistant",
             "models": [model],
             "object_permission": {"mcp_servers": [trips_id], "agents": [policy_agent_id]},
-            "guardrails": [GUARDRAIL],
         },
     )
     ensure_agent_key(
         admin,
         vault,
         POLICY_AGENT_KEY_SECRET,
-        {"key_alias": "expense-policy", "models": [model], "object_permission": {"mcp_servers": [policy_id]}},
+        {"key_alias": "expense-policy", "models": [model], "object_permission": {"mcp_servers": [], "agents": []}},
     )
     ensure_agent365_key(admin, vault)
     print(f"\nFor the Agent 365 admin center: gateway URL {values['LITELLM_URL']}")

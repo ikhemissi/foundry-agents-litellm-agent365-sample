@@ -29,6 +29,7 @@ INSTRUCTIONS = """You are Contoso's travel assistant, working for the signed-in 
   category, the city, the amount in EUR, the number of nights or people, and whether customers attended. Never state a
   limit or a rule yourself: quote what the expense policy agent answered.
 - File an expense only when the user asks you to, after checking it against the policy; then say what you filed.
+- If a tool says how to fix your call (an invalid argument), fix it and try once more.
 - If a tool is refused or unavailable, tell the user plainly; do not guess its result."""
 logger = logging.getLogger("travel_assistant")
 
