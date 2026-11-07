@@ -6,10 +6,6 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 4.81"
     }
-    azuread = {
-      source  = "hashicorp/azuread"
-      version = "~> 3.10"
-    }
   }
 
   # Remote state in an Entra-authenticated storage account, one key per layer (provider.conf.json).
@@ -22,4 +18,3 @@ provider "azurerm" {
   storage_use_azuread = true
 }
 
-provider "azuread" {}

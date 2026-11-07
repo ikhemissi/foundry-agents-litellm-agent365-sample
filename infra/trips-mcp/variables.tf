@@ -47,20 +47,18 @@ variable "acr_pull_identity_id" {
   type        = string
 }
 
-variable "allowed_caller_id" {
-  description = "Object id of the one caller allowed through external ingress, e.g. API Management's managed identity (NOTES_MCP_ALLOWED_CALLER_ID). Empty: internal ingress only, no token check."
+variable "trips_api_audience" {
+  description = "The trips API's app ID URI (TRIPS_API_AUDIENCE, from the entra-apps layer): the audience of the user tokens the server accepts."
   type        = string
-  default     = ""
-}
 
-variable "apim_principal_id" {
-  description = "API Management gateway's managed identity (APIM_PRINCIPAL_ID), the allowed caller when allowed_caller_id is empty. Empty: no API Management."
-  type        = string
-  default     = ""
+  validation {
+    condition     = startswith(var.trips_api_audience, "api://")
+    error_message = "TRIPS_API_AUDIENCE is empty: provision the entra-apps layer first."
+  }
 }
 
 variable "image" {
-  description = "Image deployed by azd (SERVICE_NOTES_MCP_IMAGE_NAME); empty before the first deployment."
+  description = "Image deployed by azd (SERVICE_TRIPS_MCP_IMAGE_NAME); empty before the first deployment."
   type        = string
   default     = ""
 }

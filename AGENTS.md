@@ -1,33 +1,30 @@
 # AGENTS.md — Foundry agents with LiteLLM, governed by Agent 365
 
-This repository is a **spike**: it answers questions by experiment, within a time box (5 days). Nothing here is production code. Read [README.md](README.md) for the questions and the status.
+This repository is a **sample**: a working, documented example of Microsoft Foundry agents using models, MCP servers and an A2A 1.0 agent through a LiteLLM gateway, governed by Microsoft Agent 365. People read it to learn and reuse the pattern: it must be correct, readable and kept positive and factual. Read [README.md](README.md) first.
 
-## How the spike works
+## What it shows
 
-- **Questions first:** [docs/QUESTIONS.md](docs/QUESTIONS.md) lists what we want to know. Every experiment answers at least one question; a question can need several experiments.
-- **One experiment, one file:** `docs/experiments/NN-<slug>.md` from [the template](docs/experiments/TEMPLATE.md): goal, setup, steps, result, evidence (commands, outputs, screenshots, queries), conclusion. Number them in the order they run; never renumber.
-- **Evidence over opinion:** record what was observed, with the date and the versions involved. Products change: a result without a date and a version cannot be retested.
-- **Findings:** [docs/FINDINGS.md](docs/FINDINGS.md) answers each question in one paragraph, with links to the experiments. Update it after every experiment, and the "Key findings" of the README (one line per question) with it. Keep the README's setup diagram in step with the infrastructure.
-- **Retest plan:** [docs/RETEST-PLAN.md](docs/RETEST-PLAN.md) lists what to run again when a product or a version changes.
-- **Demo:** [docs/DEMO-RUNBOOK.md](docs/DEMO-RUNBOOK.md) is the step-by-step script for showing the results, written for someone else to run.
-- **Time box:** when it runs out, stop and write the findings, including "unanswered" with what blocked it.
-- **Ask before deciding** when a choice changes what the spike can conclude; propose a default.
+- **Travel assistant** (`agents/travel-assistant`): a Foundry **hosted** agent (Agent Framework). It acts **as the signed-in user** towards the trips MCP server (through LiteLLM) and the expense policy agent (A2A 1.0 through LiteLLM), and uses its own LiteLLM key for the model.
+- **Expense policy agent** (`agents/expense-policy`): a Foundry **prompt** agent, the A2A 1.0 target. It uses its own LiteLLM key for its model and the expense policy MCP server.
+- **MCP servers** (`services/trips-mcp`, `services/expense-policy-mcp`): Contoso's fictional trips (per user) and expense policy.
+- **LiteLLM** (`infra/litellm-gateway`, configured by `src/configure_gateway.py`): one key per agent, the MCP servers (the trips server through an On-Behalf-Of exchange), the A2A agent, the Agent 365 guardrail.
+- **Agent 365** governs the MCP servers LiteLLM exposes (discovery, block and unblock, per tool).
 
 ## Rules
 
-- **Never commit secrets**, keys, tokens, tenant or subscription IDs, or real user data. Use your own Entra identity (Azure CLI) and managed identities; local settings go to `.env` (git-ignored).
-- **Generalize what you write:** the findings may be shared; customer, employer-internal and personal details stay out.
-- Code is throwaway but must stay readable by another developer: small scripts in `src/`, one per experiment when useful, named after it (`src/03_call_with_obo.py`), each with a one-line purpose at the top, explicit names, no clever tricks, settings from the environment.
-- **Commits:** conventional commits (`docs(experiment): 03 …`, `feat(spike): …`), ending with the trailer `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`.
-- **At the end:** harvest the reusable learnings into the knowledge base (pitfalls, findings, decisions), generalized.
+- **Never commit secrets**, keys, tokens, tenant or subscription IDs, or real user data. Use your own Entra identity (Azure CLI) and managed identities; local settings go to `.env` (git-ignored). The only client secret (the gateway app's, for LiteLLM's On-Behalf-Of exchanges) lives in Key Vault.
+- **Public content:** factual, dated observations and neutral guidance; no customer, employer-internal or personal details. Every figure an agent states comes from code (the policy server), not from the model.
+- **Identity on every hop is part of the sample:** a change that alters which identity reaches a service updates the identity table in the README.
+- **Ask before deciding** anything that changes the design, the scope or the behaviour; propose a default.
+- **Commits:** conventional commits (`feat(agents): …`, `fix(infra): …`, `docs: …`), ending with the trailer `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`.
+- **Spec-driven:** larger changes start as an OpenSpec change (`/opsx-propose`), see `openspec/`.
 
 ## Infrastructure
 
-- **Layers:** the layers listed in `azure.yaml` that come from shared building blocks (`infra/azure-platform`, `infra/foundry-model`, `infra/postgres`, `infra/litellm-gateway`, `infra/notes-mcp`, `infra/chat-ui`) are shared building blocks, each its own Terraform root and state. Keep them as they are, so that their improvements can be merged in later; put the spike's own resources in a new layer (`infra/<name>/`, reading the other layers' outputs from azd values in its `main.tfvars.json`) and add it to `azure.yaml`.
-- **Gateway settings** (MCP servers, teams, virtual keys, guardrails) go through LiteLLM's admin API, in a script under `scripts/`, not into its configuration file.
-- **Notes MCP server:** `infra/notes-mcp` and `services/notes-mcp` are a shared building block; its checks: `uv run --no-project --with-requirements requirements.txt --with-requirements requirements-dev.txt pytest` in `services/notes-mcp`.
-- **Chat UI:** `infra/chat-ui` and `services/chat-ui` are a shared building block too: change what it shows and tells the model with its settings (`CHAT_UI_TITLE`, `CHAT_UI_INTRO`, `CHAT_UI_INSTRUCTIONS`), not its files. Its checks: `npm ci && npm run typecheck && npm run lint && npm test && npm run build` in `services/chat-ui`.
-- **Before every `azd provision`:** `azd hooks run preprovision`, then `azd provision --preview`, and read the plan.
+- **Layers:** `azure.yaml` lists the azd layers (`infra/<layer>/`, one Terraform root and state each) in provisioning order. `infra/azure-platform`, `infra/foundry-model`, `infra/postgres`, `infra/litellm-gateway` and `infra/chat-ui` come from shared building blocks: keep them as they are, so that their improvements can be merged in later. The sample's own layers: `infra/entra-apps`, `infra/trips-mcp`, `infra/expense-policy-mcp`.
+- **Gateway settings** (MCP servers, A2A agents, keys, guardrails) go through LiteLLM's admin API (`src/configure_gateway.py`), not into its configuration file.
+- **Checks:** in each of `services/trips-mcp` and `services/expense-policy-mcp`: `uvx ruff check . && uv run --no-project --with-requirements requirements.txt --with-requirements requirements-dev.txt pytest`; in `services/chat-ui`: `npm ci && npm run typecheck && npm run lint && npm test && npm run build`; for a layer: `terraform -chdir=infra/<layer> init -backend=false && terraform -chdir=infra/<layer> validate`.
+- **Before every `azd provision`:** `azd hooks run preprovision`, then `azd provision <layer> --preview` for each layer you change (azd previews one layer at a time), and read the plan.
 
 ## Code humans can maintain
 

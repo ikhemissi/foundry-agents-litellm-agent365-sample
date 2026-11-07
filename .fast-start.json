@@ -11,7 +11,6 @@
     "foundry-model",
     "postgres",
     "litellm-gateway",
-    "notes-mcp",
     "chat-ui"
   ],
   "answers": {
