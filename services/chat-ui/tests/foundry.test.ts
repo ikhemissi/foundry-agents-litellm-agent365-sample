@@ -8,6 +8,7 @@ import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from "jose";
 import { verifyFoundryToken } from "../lib/server/auth";
 import { getConfig, publicConfig, responsesUrl, type FoundryConfig } from "../lib/server/config";
 import { foundryToAgUiEvents, streamFoundryAgent } from "../lib/server/foundry";
+import { forgetAllSessions, rememberedSession, rememberSession, sessionKey } from "../lib/server/foundry-sessions";
 import type { ResponsesEvent } from "../lib/server/responses-stream";
 import { decodeToolResult } from "../lib/tool-result";
 import { collect, environment, fromArray, id, streamResponse, type GatewayEvent } from "./helpers";
@@ -47,23 +48,58 @@ test("Foundry mode needs the agent's name and the gateway scope, and gives the b
   assert.throws(() => getConfig({ ...foundryEnvironment, FOUNDRY_AGENT: "travel assistant" }), /FOUNDRY_AGENT/);
 });
 
-test("the agent is called with the user's Foundry token and both tokens forwarded in x-client-* headers", async () => {
+const messages = [{ role: "user" as const, content: "Which trips do I have?" }];
+
+// Each call answers with a session id in x-agent-session-id, as Foundry does; the request bodies are kept.
+function foundryAgent(sessionIds: string[]) {
+  const bodies: Record<string, unknown>[] = [];
   let sent: RequestInit | undefined;
   const fetchImpl = (async (_url: string, init: RequestInit) => {
     sent = init;
-    return streamResponse(listTrips);
+    bodies.push(JSON.parse(String(init.body)));
+    const response = streamResponse(listTrips);
+    response.headers.set("x-agent-session-id", sessionIds[bodies.length - 1] ?? "unused");
+    return response;
   }) as typeof fetch;
-  const messages = [{ role: "user" as const, content: "Which trips do I have?" }];
-
-  await collect(streamFoundryAgent({
-    config, messages, signal: new AbortController().signal, foundryToken: "foundry-token", gatewayToken: "gateway-token", fetchImpl,
+  const ask = (sessionKey: string) => collect(streamFoundryAgent({
+    config, messages, signal: new AbortController().signal, foundryToken: "foundry-token", gatewayToken: "gateway-token",
+    sessionKey, fetchImpl,
   }));
+  return { ask, bodies, sent: () => sent };
+}
+
+test("the agent is called with the user's Foundry token and both tokens forwarded in x-client-* headers", async () => {
+  forgetAllSessions();
+  const agent = foundryAgent(["session-1"]);
+
+  await agent.ask(sessionKey(id(5), "thread-1"));
+
+  const sent = agent.sent();
 
   const headers = sent?.headers as Record<string, string>;
   assert.equal(headers.Authorization, "Bearer foundry-token");
   assert.equal(headers["x-client-foundry-token"], "foundry-token");
   assert.equal(headers["x-client-gateway-token"], "gateway-token");
   assert.deepEqual(JSON.parse(String(sent?.body)), { input: messages, stream: true });
+});
+
+test("a chat thread's later messages reuse the agent's session, for the same user only", async () => {
+  forgetAllSessions();
+  const agent = foundryAgent(["session-1", "session-1", "session-2"]);
+
+  await agent.ask(sessionKey(id(5), "thread-1"));
+  await agent.ask(sessionKey(id(5), "thread-1"));
+  await agent.ask(sessionKey(id(6), "thread-1"));
+
+  assert.deepEqual(agent.bodies.map((body) => body.agent_session_id), [undefined, "session-1", undefined]);
+});
+
+test("a session idle for more than 15 minutes is not reused", () => {
+  forgetAllSessions();
+  rememberSession("user:thread", "session-1", 0);
+
+  assert.equal(rememberedSession("user:thread", 14 * 60_000), "session-1");
+  assert.equal(rememberedSession("user:thread", 30 * 60_000), undefined);
 });
 
 test("a tool call the agent ran is shown once, as soon as it is reported, with its arguments and result", async () => {

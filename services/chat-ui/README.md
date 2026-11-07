@@ -66,7 +66,7 @@ the app shows what LiteLLM reports. The team key stays on the server. With API M
 | `lib/server/responses-stream.ts` | One streamed Responses API call (either gateway): refusals, server-sent events, its span |
 | `lib/server/litellm.ts` | LiteLLM mode: the team key, the user's token, LiteLLM's MCP tool |
 | `lib/server/responses-to-ag-ui.ts` | Responses events → AG-UI events: the text (both modes) and LiteLLM's `mcp_call` items |
-| `lib/server/foundry.ts` | Foundry mode: calls the hosted agent with the user's tokens, its `function_call` items → AG-UI events |
+| `lib/server/foundry.ts`, `lib/server/foundry-sessions.ts` | Foundry mode: calls the hosted agent with the user's tokens, reusing its session per chat thread; its `function_call` items → AG-UI events |
 | `lib/server/tool-loop.ts` | API Management mode: the tool loop (model rounds, tool calls, their AG-UI events) |
 | `lib/server/mcp-tools.ts` | API Management mode: the MCP servers through the gateway (connect, list, call, close), function tool names |
 | `lib/tool-result.ts` | A tool result as the chat shows it (`ok` or `error`) |
@@ -195,6 +195,10 @@ own tools as the signed-in user. This server never calls the gateway.
 - The agent reports each tool call as a `function_call` item, then its `function_call_output`: each is shown as soon
   as it arrives (unlike the gateway modes, where tool lines follow the answer), since another agent over A2A can take
   several seconds.
+- A chat thread's later messages reuse the agent's session (`agent_session_id` in the request body; Foundry returns it
+  in `x-agent-session-id`), so they find the agent's container warm: a new session takes about 5–8 s to start. The
+  server remembers one session per user and thread, in memory, for up to 15 minutes of inactivity
+  (`lib/server/foundry-sessions.ts`).
 
 ## Run locally
 

@@ -8,6 +8,7 @@ import { z } from "zod";
 import type { ChatConfig } from "./config";
 import { ChatError, reportError } from "./errors";
 import { foundryToAgUiEvents, streamFoundryAgent } from "./foundry";
+import { sessionKey } from "./foundry-sessions";
 import { streamLiteLLM } from "./litellm";
 import type { McpConnect } from "./mcp-tools";
 import type { ChatMessage } from "./responses-stream";
@@ -84,11 +85,13 @@ export class GatewayAgent extends AbstractAgent {
   }
 
   // The one difference between the modes: who runs the MCP tools.
-  private events(messages: ChatMessage[], signal: AbortSignal, runId: string): AsyncGenerator<BaseEvent> {
-    const { config, gatewayToken, foundryToken, fetchImpl, connectMcp } = this.context;
+  private events(messages: ChatMessage[], signal: AbortSignal, runId: string, threadId: string): AsyncGenerator<BaseEvent> {
+    const { config, gatewayToken, foundryToken, userId, fetchImpl, connectMcp } = this.context;
     if (config.CHAT_GATEWAY === "foundry") {
       if (!foundryToken || !gatewayToken) throw new ChatError("authentication", "missing_user_tokens", "Sign in again.", 401);
-      const stream = streamFoundryAgent({ config, messages, signal, foundryToken, gatewayToken, fetchImpl });
+      const stream = streamFoundryAgent({
+        config, messages, signal, foundryToken, gatewayToken, sessionKey: sessionKey(userId, threadId), fetchImpl,
+      });
       return foundryToAgUiEvents(stream, runId);
     }
     if (config.CHAT_GATEWAY === "apim") {
@@ -110,7 +113,7 @@ export class GatewayAgent extends AbstractAgent {
       subscriber.next({ type: EventType.RUN_STARTED, threadId, runId });
       const execute = async () => {
         if (input.tools.length) throw new ChatError("request", "unsupported_tools", "The chat does not accept tools from the browser.", 400);
-        for await (const event of this.events(conversation(input.messages), signal, runId)) {
+        for await (const event of this.events(conversation(input.messages), signal, runId, threadId)) {
           signal.throwIfAborted();
           telemetry.observe(event);
           subscriber.next(event);
