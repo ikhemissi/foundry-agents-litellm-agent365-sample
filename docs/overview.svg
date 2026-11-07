@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-labelledby="title desc">
+  <title id="title">Foundry agents with LiteLLM, governed by Agent 365</title>
+  <desc id="desc">The user chats with a Foundry hosted agent, which acts as the user. Through a LiteLLM gateway it calls an MCP server and, over A2A 1.0, a Foundry prompt agent; both agents use models through LiteLLM. Agent 365 governs every MCP tool call.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3d4466"/>
+    </marker>
+    <marker id="arrow-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#138a7a"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1b1f3b" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+  <style>
+    text { fill: #1b1f3b; }
+    .title { font-size: 34px; font-weight: 700; }
+    .subtitle { font-size: 18px; fill: #4a5072; }
+    .name { font-size: 18px; font-weight: 700; }
+    .kind { font-size: 14px; fill: #4a5072; }
+    .note { font-size: 13px; fill: #5b4fd6; font-weight: 600; }
+    .edge { font-size: 13px; fill: #3d4466; font-weight: 600; }
+    .pill { font-size: 15px; font-weight: 700; fill: #8a4b00; }
+    .chip { font-size: 14px; font-weight: 600; fill: #1b1f3b; }
+    .footer { font-size: 14px; fill: #4a5072; }
+    .governance { font-size: 13px; fill: #138a7a; font-weight: 600; }
+  </style>
+
+  <rect width="1200" height="675" fill="#f7f8fc"/>
+
+  <text class="title" x="48" y="66">Foundry agents · LiteLLM · Agent 365</text>
+  <text class="subtitle" x="48" y="98">Two Foundry agents work together through one governed gateway, acting as the signed-in user.</text>
+
+  <!-- You -->
+  <circle cx="82" cy="318" r="24" fill="#ffffff" stroke="#3d4466" stroke-width="2"/>
+  <circle cx="82" cy="311" r="7" fill="#3d4466"/>
+  <path d="M68,330 a14,11 0 0 1 28,0" fill="#3d4466"/>
+  <text class="name" x="82" y="368" text-anchor="middle">You</text>
+
+  <!-- Chat UI -->
+  <g filter="url(#shadow)">
+    <rect x="132" y="273" width="166" height="90" rx="12" fill="#ffffff" stroke="#3d4466" stroke-width="1.5"/>
+  </g>
+  <text class="name" x="215" y="309" text-anchor="middle">Chat</text>
+  <text class="kind" x="215" y="331" text-anchor="middle">CopilotKit · AG-UI</text>
+
+  <!-- Travel assistant (hosted agent) -->
+  <g filter="url(#shadow)">
+    <rect x="344" y="253" width="206" height="130" rx="12" fill="#efedff" stroke="#5b4fd6" stroke-width="2"/>
+  </g>
+  <text class="name" x="447" y="291" text-anchor="middle">Travel assistant</text>
+  <text class="kind" x="447" y="313" text-anchor="middle">Foundry hosted agent</text>
+  <text class="kind" x="447" y="333" text-anchor="middle">Microsoft Agent Framework</text>
+  <text class="note" x="447" y="361" text-anchor="middle">acts as you</text>
+
+  <!-- Agent 365 -->
+  <g filter="url(#shadow)">
+    <rect x="590" y="128" width="230" height="64" rx="12" fill="#e7f6f3" stroke="#138a7a" stroke-width="2"/>
+  </g>
+  <text class="name" x="705" y="156" text-anchor="middle">Agent 365</text>
+  <text class="governance" x="705" y="178" text-anchor="middle">discovers · blocks · evaluates</text>
+
+  <!-- LiteLLM gateway -->
+  <g filter="url(#shadow)">
+    <rect x="605" y="223" width="200" height="252" rx="14" fill="#fff6ea" stroke="#e08a1e" stroke-width="2"/>
+  </g>
+  <text class="name" x="705" y="255" text-anchor="middle">LiteLLM gateway</text>
+  <text class="kind" x="705" y="275" text-anchor="middle">one key per agent</text>
+  <rect x="627" y="290" width="156" height="42" rx="21" fill="#ffffff" stroke="#e08a1e" stroke-width="1.5"/>
+  <text class="pill" x="705" y="316" text-anchor="middle">MCP</text>
+  <rect x="627" y="345" width="156" height="42" rx="21" fill="#ffffff" stroke="#e08a1e" stroke-width="1.5"/>
+  <text class="pill" x="705" y="371" text-anchor="middle">A2A 1.0</text>
+  <rect x="627" y="400" width="156" height="42" rx="21" fill="#ffffff" stroke="#e08a1e" stroke-width="1.5"/>
+  <text class="pill" x="705" y="426" text-anchor="middle">Models</text>
+
+  <!-- Trips MCP server -->
+  <g filter="url(#shadow)">
+    <rect x="890" y="200" width="262" height="78" rx="12" fill="#ffffff" stroke="#3d4466" stroke-width="1.5"/>
+  </g>
+  <text class="name" x="1021" y="232" text-anchor="middle">Trips MCP server</text>
+  <text class="kind" x="1021" y="254" text-anchor="middle">your trips and expenses</text>
+
+  <!-- Expense policy agent (prompt agent) -->
+  <g filter="url(#shadow)">
+    <rect x="890" y="303" width="262" height="108" rx="12" fill="#efedff" stroke="#5b4fd6" stroke-width="2"/>
+  </g>
+  <text class="name" x="1021" y="336" text-anchor="middle">Expense policy agent</text>
+  <text class="kind" x="1021" y="358" text-anchor="middle">Foundry prompt agent</text>
+  <text class="note" x="1021" y="386" text-anchor="middle">skill + code interpreter</text>
+
+  <!-- Foundry models -->
+  <g filter="url(#shadow)">
+    <rect x="890" y="430" width="262" height="78" rx="12" fill="#ffffff" stroke="#3d4466" stroke-width="1.5"/>
+  </g>
+  <text class="name" x="1021" y="462" text-anchor="middle">Foundry models</text>
+  <text class="kind" x="1021" y="484" text-anchor="middle">LiteLLM's managed identity</text>
+
+  <!-- Arrows -->
+  <line x1="108" y1="318" x2="130" y2="318" stroke="#3d4466" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="298" y1="318" x2="342" y2="318" stroke="#3d4466" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="550" y1="318" x2="603" y2="318" stroke="#3d4466" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <line x1="783" y1="304" x2="888" y2="246" stroke="#3d4466" stroke-width="2" marker-end="url(#arrow)"/>
+  <text class="edge" x="840" y="262" text-anchor="middle" transform="rotate(-29 840 262)">as you</text>
+  <line x1="783" y1="366" x2="888" y2="357" stroke="#3d4466" stroke-width="2" marker-end="url(#arrow)"/>
+  <text class="edge" x="836" y="352" text-anchor="middle">as you</text>
+  <line x1="783" y1="421" x2="888" y2="462" stroke="#3d4466" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="705" y1="194" x2="705" y2="221" stroke="#138a7a" stroke-width="2.5" stroke-dasharray="6 4" marker-end="url(#arrow-teal)"/>
+
+  <!-- Standards -->
+  <text class="footer" x="48" y="556" font-weight="700" fill="#1b1f3b">Open standards end to end</text>
+  <g>
+    <rect x="48" y="572" width="74" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
+    <text class="chip" x="85" y="594" text-anchor="middle">MCP</text>
+    <rect x="132" y="572" width="92" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
+    <text class="chip" x="178" y="594" text-anchor="middle">A2A 1.0</text>
+    <rect x="234" y="572" width="82" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
+    <text class="chip" x="275" y="594" text-anchor="middle">AG-UI</text>
+    <rect x="326" y="572" width="186" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
+    <text class="chip" x="419" y="594" text-anchor="middle">OpenAI Responses API</text>
+    <rect x="522" y="572" width="126" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
+    <text class="chip" x="585" y="594" text-anchor="middle">Agent Skills</text>
+    <rect x="658" y="572" width="138" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
+    <text class="chip" x="727" y="594" text-anchor="middle">OpenTelemetry</text>
+    <rect x="806" y="572" width="96" height="34" rx="17" fill="#ffffff" stroke="#c9cde3"/>
+    <text class="chip" x="854" y="594" text-anchor="middle">Entra ID</text>
+  </g>
+  <text class="footer" x="48" y="642">The user's identity on every MCP and A2A call · one gateway key per agent · every MCP tool call evaluated by Agent 365</text>
+</svg>
