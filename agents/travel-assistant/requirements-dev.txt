@@ -1,0 +1,3 @@
+# Test tools only (not deployed): uv run --no-project --with-requirements requirements.txt --with-requirements requirements-dev.txt pytest
+pytest==9.2.0
+pytest-asyncio==1.3.0

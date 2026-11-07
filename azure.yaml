@@ -1,5 +1,10 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
 name: foundry-agents-litellm-agent365-sample
+requiredVersions:
+  azd: ">= 1.37.0"
+  extensions:
+    azure.ai.agents: ">= 1.0.0"
+    azure.ai.projects: ">= 1.0.0"
 
 # One Terraform root per layer (infra/<layer>/), provisioned in this order; layers pass values through the azd
 # environment.
@@ -39,12 +44,60 @@ infra:
     - name: expense-policy-mcp
       path: infra/expense-policy-mcp
       dependsOn: [azure-platform]
+    # The deployer's Foundry Agent Consumer role; its hook configures LiteLLM and deploys the expense policy agent.
+    - name: agents
+      path: infra/agents
+      dependsOn: [foundry-model, litellm-gateway, entra-apps, trips-mcp, expense-policy-mcp]
+      hooks:
+        postprovision:
+          posix:
+            shell: sh
+            run: bash ./hooks/postprovision.sh
     # Reads the team's LiteLLM key from Key Vault: create it before provisioning this layer (README).
     - name: chat-ui
       path: infra/chat-ui
       dependsOn: [azure-platform, foundry-model, litellm-gateway]
 
 services:
+  # The Foundry project of the foundry-model layer, for the agent services below.
+  foundry-project:
+    host: azure.ai.project
+    endpoint: ${FOUNDRY_PROJECT_ENDPOINT}
+  # Contoso's travel assistant: a hosted agent (agents/travel-assistant/main.py), deployed as code.
+  travel-assistant:
+    host: azure.ai.agent
+    project: ./agents/travel-assistant
+    language: python
+    kind: hosted
+    name: travel-assistant
+    description: Contoso's travel assistant. Acts for the signed-in user on their trips and asks the expense policy agent over A2A 1.0, through LiteLLM.
+    uses:
+      - foundry-project
+    codeConfiguration:
+      runtime: python_3_13
+      entryPoint: main.py
+      dependencyResolution: remote_build
+    protocols:
+      - protocol: responses
+        version: 2.0.0
+    env:
+      LITELLM_URL: ${LITELLM_URL}
+      KEY_VAULT_URI: ${PLATFORM_KEY_VAULT_URI}
+      LITELLM_KEY_SECRET_NAME: litellm-key-travel-assistant
+      MODEL: ${FOUNDRY_MODEL_DEPLOYMENT_NAME}
+      TRIPS_MCP_SERVER: Contoso_Trips
+      EXPENSE_POLICY_A2A_AGENT: expense_policy_agent
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${PLATFORM_APPLICATION_INSIGHTS_CONNECTION_STRING}
+      OTEL_SERVICE_NAME: travel-assistant
+    container:
+      resources:
+        cpu: "0.5"
+        memory: 1Gi
+    hooks:
+      postdeploy:
+        posix:
+          shell: sh
+          run: bash ../../infra/agents/hooks/grant-travel-assistant.sh
   trips-mcp:
     project: ./services/trips-mcp
     language: python
