@@ -15,12 +15,14 @@ In the Microsoft 365 admin center, open the Agent 365 gateway settings, add a Li
 
 ## Block and unblock a tool
 
-1. In the chat, ask: *"Please file a 35 EUR taxi on my Paris trip."* The travel assistant files it with `Contoso_Trips-add_expense`.
+1. In the chat, ask: *"Please file a 35 EUR taxi on my Paris trip."* The travel assistant checks the policy, then files it with `Contoso_Trips-add_expense`.
 2. In Agent 365, block the tool `add_expense` of `Contoso_Trips`.
-3. Ask again. The tool line under the answer shows the refusal, and the assistant says the tool is unavailable; reading trips (`list_trips`, `get_trip`) still works.
+3. Ask to file another expense (for example *"Please file a 40 EUR taxi fare on my Paris trip."*). LiteLLM no longer lists `add_expense`, so the travel assistant does not have it: it still checks the policy, then answers that expense filing isn't available. Reading trips (`list_trips`, `get_trip`) still works.
 4. Unblock `add_expense` and ask again: the expense is filed.
 
-Blocking the whole server stops every trips tool the same way. Agent 365 applies a block as LiteLLM's allowlist for the server, so it holds for every key and every caller.
+Observed on 2026-11-07: a block or an unblock took effect within seconds. Blocking the whole server stops every trips tool the same way; Agent 365 applies a block as LiteLLM's allowlist for the server, so it holds for every key and every caller.
+
+`src/configure_gateway.py` registers `Contoso_Trips` under an enforced tool allowlist of its three tools, which per-tool toggles need; when it runs again, it keeps the server's current allowlist, so it never undoes a block made in Agent 365.
 
 ## See the evaluations
 

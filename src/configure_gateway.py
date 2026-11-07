@@ -21,6 +21,7 @@ import os
 from gateway_admin import Gateway, azd_values, read_secret, store_secret
 
 TRIPS_SERVER = "Contoso_Trips"
+TRIPS_TOOLS = ["list_trips", "get_trip", "add_expense"]
 POLICY_A2A_AGENT = "expense_policy_agent"
 POLICY_FOUNDRY_AGENT = "expense-policy"
 GUARDRAIL = "agent365"
@@ -30,17 +31,26 @@ TRAVEL_ASSISTANT_KEY_SECRET = "litellm-key-travel-assistant"
 POLICY_AGENT_KEY_SECRET = "litellm-key-expense-policy"
 
 
-def ensure_mcp_server(admin: Gateway, settings: dict) -> str:
-    """Creates or updates an MCP server, found by name; returns its id."""
+def ensure_mcp_server(admin: Gateway, settings: dict, tools: list[str]) -> str:
+    """Creates or updates an MCP server, found by name; returns its id.
+
+    A new server starts under an enforced tool allowlist of its tools, so that Agent 365's per-tool toggles apply at
+    once (on a server without one, they apply only after a block and an unblock). After that, the allowlist belongs to
+    Agent 365: an update keeps the server's current allowed_tools and mcp_info, so that running this script again
+    never undoes a block."""
     name = settings["server_name"]
     existing = [server for server in admin.call("GET", "/v1/mcp/server") if server.get("server_name") == name]
     if existing:
         server_id = existing[0]["server_id"]
-        admin.call("PUT", "/v1/mcp/server", {"server_id": server_id, **settings})
-        print(f"MCP server '{name}' updated ({server_id})")
+        # The list omits mcp_info; the server's own record has it.
+        current = admin.call("GET", f"/v1/mcp/server/{server_id}")
+        governed = {"allowed_tools": current.get("allowed_tools"), "mcp_info": current.get("mcp_info") or {}}
+        admin.call("PUT", "/v1/mcp/server", {"server_id": server_id, **settings, **governed})
+        print(f"MCP server '{name}' updated ({server_id}); allowed tools kept: {governed['allowed_tools']}")
         return server_id
-    server_id = admin.call("POST", "/v1/mcp/server", settings)["server_id"]
-    print(f"MCP server '{name}' created ({server_id})")
+    governed = {"allowed_tools": tools, "mcp_info": {"tool_allowlist_enforced": True}}
+    server_id = admin.call("POST", "/v1/mcp/server", {**settings, **governed})["server_id"]
+    print(f"MCP server '{name}' created ({server_id}), allowed tools {tools}")
     return server_id
 
 
@@ -164,7 +174,7 @@ def main() -> None:
     admin = Gateway(values["LITELLM_URL"], admin_key)
     model = values["FOUNDRY_MODEL_DEPLOYMENT_NAME"]
 
-    trips_id = ensure_mcp_server(admin, trips_server(values))
+    trips_id = ensure_mcp_server(admin, trips_server(values), TRIPS_TOOLS)
     policy_agent_id = ensure_a2a_agent(admin, values)
     ensure_guardrail(admin, values, gateway_secret)
     ensure_agent_key(
