@@ -16,11 +16,11 @@ The scenario is fictional: Contoso's **travel assistant** reads an employee's tr
 
 > **You:** I'm in Paris next week. Is my hotel within the policy, and can I expense a €220 dinner for 4 with the customer?
 >
-> **Travel assistant:** Your Paris hotel is within policy: €210 per night is below the €230-per-night limit. The €220 dinner for 4 with a customer is also within policy: the limit is €360 (4 × €90). No manager approval is needed; keep the receipts.
+> **Travel assistant** (abridged): Your Paris hotel is within policy: €210 per night is below the €230-per-night limit. The €220 dinner for 4 with a customer is also within policy: the limit is €360 (4 × €90). No manager approval is needed; keep the receipts.
 >
 > *Tool calls shown under the answer:* `Contoso_Trips-list_trips` (as you, through LiteLLM), `ask_expense_policy` twice (A2A 1.0, as you, through LiteLLM).
 
-Then *"Please file the dinner"* files it on your trip with `Contoso_Trips-add_expense`. An administrator who blocks `add_expense` in Agent 365 stops that call at the gateway within seconds, and unblocking it restores it ([Govern with Agent 365](docs/agent365.md)).
+Then *"Please file the dinner"* files it on your trip with `Contoso_Trips-add_expense`. When an administrator blocks `add_expense` in Agent 365, the gateway stops offering it within seconds: the assistant still checks the policy but can no longer file expenses, until the tool is unblocked ([Govern with Agent 365](docs/agent365.md)).
 
 ## Architecture
 
@@ -63,7 +63,7 @@ sequenceDiagram
     Chat->>TA: Responses, as the user<br/>+ the user's gateway and Foundry tokens (x-client-*)
     TA->>LL: Model call (the travel assistant's key)
     LL->>Model: LiteLLM's managed identity
-    Model-->>TA: Ask the policy, then file the expense
+    LL-->>TA: Tool call: ask_expense_policy
     TA->>LL: A2A 1.0 SendMessage<br/>(the travel assistant's key + the user's Foundry token)
     LL->>Policy: The user's Foundry token, passed on
     Policy->>LL: Model call (the expense policy agent's key)
@@ -71,6 +71,8 @@ sequenceDiagram
     Note over Policy: The code interpreter runs policy.py:<br/>4 x 90 = 360 EUR, within the policy
     Policy-->>LL: Answer
     LL-->>TA: Answer
+    TA->>LL: Model call, with the policy's answer
+    LL-->>TA: Tool call: add_expense
     TA->>LL: MCP tools/call add_expense<br/>(the travel assistant's key + the user's gateway token)
     LL->>A365: Evaluate the call, On-Behalf-Of the user
     A365-->>LL: Allow
@@ -78,6 +80,8 @@ sequenceDiagram
     Note over Trips: Checks the token, files the expense<br/>for this user only
     Trips-->>LL: Expense filed
     LL-->>TA: Expense filed
+    TA->>LL: Model call, with the result
+    LL-->>TA: The answer
     TA-->>Chat: Answer and tool calls, streamed
     Chat-->>User: "Filed the €220 dinner on your Paris trip."
 ```
@@ -114,16 +118,17 @@ az login && azd auth login
 azd extension install azure.ai.agents azure.ai.projects   # or: azd extension upgrade …
 azd env new <name> --location francecentral
 azd env set RESOURCE_TAGS "key=value"            # optional: tags your organisation's policies require
-azd hooks run preprovision                       # remote Terraform state, model quota check
-azd provision <layer> --preview                  # for each layer in azure.yaml: read the plan before applying
+azd hooks run preprovision                       # creates the remote Terraform state
 azd up
 ```
 
-`azd up` provisions the layers, then deploys the services. Along the way:
+`azd up` provisions the layers in the order of `azure.yaml` (the foundry-model layer checks the model's quota first), then deploys the services. Along the way:
 
 - the `agents` layer's hook configures LiteLLM and deploys the expense policy agent ([src](src));
 - the travel assistant's postdeploy hook gives its identity read access to its own LiteLLM key and the right to publish telemetry;
 - the chat-ui layer's hook pre-authorizes the chat on the gateway app.
+
+To change an environment later, preview each layer you change and read its plan before applying it: `azd provision <layer> --preview`, then `azd provision <layer>`.
 
 Open the chat: `azd env get-value CHAT_UI_URL`. Only the user who deployed is allowed in (the chat layer's `ALLOWED_USER_OBJECT_IDS`), with the Foundry Agent Consumer role on the project (given by the `agents` layer).
 
@@ -140,27 +145,33 @@ Connect LiteLLM to Agent 365, then block and unblock tools: see [docs/agent365.m
 ## Observe
 
 - **Application Insights** receives OpenTelemetry from the chat, the travel assistant and LiteLLM. Each Agent 365 evaluation is a `guardrail` dependency with its verdict, for example `{"verdict": "Allow", "defender_status": "Evaluated"}`.
-- **LiteLLM's spend logs** (`/ui`, user `admin`, the admin key in Key Vault as `litellm-master-key`) show each call by key alias, model, MCP tool and A2A agent.
-- **The trips MCP server's log** shows, for each call, the user and the application that called on their behalf.
+- **LiteLLM's spend logs** (`/ui`, user `admin`, the admin key in Key Vault as `litellm-master-key`) show each call with the alias of the key that made it.
+- **The trips MCP server's log** shows, for each tool call, the user (`oid`) and the application they signed in to (`azp`).
 
 ## Design notes
 
-- **Two kinds of agents, two roles.** The travel assistant is code (a hosted agent), so it can bind each request to the user's tokens and build its tools per request. The expense policy agent is configuration (a prompt agent): instructions, a model, the code interpreter. Prompt agents are the A2A targets in Foundry, so the expense policy agent is the one reached over A2A.
+- **Two kinds of agents, two roles.** The travel assistant is code (a hosted agent), so it can bind each request to the user's tokens and build its tools per request. The expense policy agent is configuration (a prompt agent): instructions, a model, the code interpreter. Foundry exposes a prompt agent over A2A directly, so the expense policy agent is the one reached over A2A, with no server code of its own.
 - **Figures come from code.** The policy's limits and checks are in [policy.py](agents/expense-policy/skill/scripts/policy.py) (tested), which the expense policy agent runs in the code interpreter for every answer. The skill folder follows the open Agent Skills format, so it can also be published as a Foundry skill.
 - **One key per agent.** Each agent's LiteLLM key allows exactly the models, MCP servers and A2A agents it uses, and names it in LiteLLM's logs.
 - **A user token on every MCP call.** The Agent 365 guardrail evaluates each MCP tool call as the user, and LiteLLM's open-source edition applies guardrails to every key alike. So every MCP call through LiteLLM carries a user token, and the expense policy agent, which acts as itself, calls no MCP server.
 - **The user's token reaches the trips server.** LiteLLM passes the user's gateway token on unchanged (`oauth_delegate`), and the trips server checks it (tenant, the gateway app's audience, the `Tools.Use` scope) before any tool runs. Discovery (`initialize`, `tools/list`) needs no token, so that Agent 365 can list the tools with its own key; tool definitions hold no user data. LiteLLM's On-Behalf-Of exchange (`oauth2_token_exchange`) would give the trips server a token of its own audience, but it then needs a user token for discovery as well, which Agent 365 does not send.
-- **A single client secret.** The Agent 365 guardrail's On-Behalf-Of exchange uses the gateway app's client secret, kept in Key Vault (and in LiteLLM's database). Everything else is passwordless: managed identities and the users' own tokens.
+- **Credentials.** Users and agents act with Entra tokens: the users' own tokens, managed identities for the services (LiteLLM to the models, the trips MCP server to its storage), and the travel assistant's agent identity (to Key Vault and Application Insights). Each agent's LiteLLM key is kept in Key Vault, and the expense policy agent's in a project connection. The one client secret, the gateway app's (for the Agent 365 guardrail's On-Behalf-Of exchange), is kept in Key Vault and in LiteLLM's database.
 
 Versions used (November 2026): LiteLLM v1.106.6, Microsoft Agent Framework 1.22, MCP Python SDK 2.3, CopilotKit 1.79, azd 1.37 with the Foundry extensions 1.0, model `gpt-6-luna`.
 
 ## Clean up
 
+Delete the two agents first, so that their Entra agent identities go with them:
+
 ```bash
+for agent in travel-assistant expense-policy; do
+  az rest --method delete --resource https://ai.azure.com \
+    --url "$(azd env get-value FOUNDRY_PROJECT_ENDPOINT)/agents/$agent?api-version=v1&force=true"
+done
 azd down --purge
 ```
 
-It deletes the resource group and purges the Key Vault and the Foundry account. The app registrations created by the `entra-apps` and `chat-ui` layers are deleted with their layers. Remove the LiteLLM gateway from Agent 365 (Gateways) too.
+`azd down --purge` deletes the resource group and purges the Key Vault and the Foundry account. The app registrations created by the `entra-apps` and `chat-ui` layers are deleted with their layers. Remove the LiteLLM gateway from Agent 365 (Gateways) too.
 
 ## License
 
