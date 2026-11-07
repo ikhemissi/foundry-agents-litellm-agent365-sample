@@ -1,0 +1,23 @@
+[project]
+name = "foundry-agents-litellm-agent365-sample"
+version = "0.1.0"
+description = "How do Foundry hosted and prompt agents use models, MCP tools and A2A 1.0 agents through LiteLLM, as the signed-in user where it matters, with Agent 365 governing the tools?"
+requires-python = ">=3.13"
+dependencies = [
+    "azure-identity>=1.27.0",
+    "openai>=3.42.0",
+    "python-dotenv>=1.2.1",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "ruff>=0.17.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"

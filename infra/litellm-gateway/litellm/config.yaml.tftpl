@@ -1,0 +1,22 @@
+# LiteLLM proxy configuration, rendered by Terraform (main.tf, templatefile) with the model of the foundry-model layer.
+# Everything else a project needs (MCP servers, teams, virtual keys, guardrails) is created through the admin API or UI
+# and kept in the database: change this file only for settings every project of this block should get.
+
+model_list:
+  - model_name: ${model_deployment_name}
+    litellm_params:
+      model: azure/${model_deployment_name}
+      api_base: ${openai_endpoint}
+      api_version: "2025-04-01-preview"
+
+litellm_settings:
+  # Entra tokens for Foundry from the managed identity (AZURE_CLIENT_ID), refreshed before they expire.
+  enable_azure_ad_token_refresh: true
+  callbacks: ["otel"]
+  # Spend and audit logs keep metadata, not prompts or completions.
+  turn_off_message_logging: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  # Objects created through the admin API (MCP servers, guardrails) persist in the database.
+  store_model_in_db: true

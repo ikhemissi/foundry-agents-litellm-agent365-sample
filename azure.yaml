@@ -1,0 +1,79 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+name: foundry-agents-litellm-agent365-sample
+
+# One Terraform root per layer (infra/<layer>/), provisioned in this order; layers pass values through the azd
+# environment. Add the spike's own layers after these.
+infra:
+  provider: terraform
+  layers:
+    - name: azure-platform
+      path: infra/azure-platform
+    - name: foundry-model
+      path: infra/foundry-model
+      dependsOn: [azure-platform]
+      hooks:
+        preprovision:
+          posix:
+            shell: sh
+            run: bash ./hooks/preprovision.sh
+    - name: postgres
+      path: infra/postgres
+      dependsOn: [azure-platform]
+    - name: litellm-gateway
+      path: infra/litellm-gateway
+      dependsOn: [azure-platform, foundry-model, postgres]
+      hooks:
+        postprovision:
+          posix:
+            shell: sh
+            run: bash ./hooks/postprovision.sh
+    # With API Management, only the gateway's identity can call it (external ingress); with LiteLLM, internal ingress.
+    - name: notes-mcp
+      path: infra/notes-mcp
+      dependsOn: [azure-platform]
+    # Reads the team's LiteLLM key from Key Vault: create it before provisioning this layer (README).
+    - name: chat-ui
+      path: infra/chat-ui
+      dependsOn: [azure-platform, foundry-model, litellm-gateway]
+
+services:
+  notes-mcp:
+    project: ./services/notes-mcp
+    language: python
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      # Images are built in the platform's registry: no local Docker needed to deploy.
+      remoteBuild: true
+    hooks:
+      postdeploy:
+        posix:
+          shell: sh
+          run: bash ../../infra/notes-mcp/hooks/postdeploy.sh
+  chat-ui:
+    project: ./services/chat-ui
+    language: ts
+    host: containerapp
+    docker:
+      path: ./Dockerfile
+      # Images are built in the platform's registry: no local Docker needed to deploy.
+      remoteBuild: true
+    hooks:
+      postdeploy:
+        posix:
+          shell: sh
+          run: bash ../../infra/chat-ui/hooks/postdeploy.sh
+
+hooks:
+  preprovision:
+    posix:
+      shell: sh
+      run: bash ./infra/azure-platform/hooks/preprovision.sh
+      interactive: false
+      continueOnError: false
+  predown:
+    posix:
+      shell: sh
+      run: bash ./infra/azure-platform/hooks/predown.sh
+      interactive: false
+      continueOnError: false
