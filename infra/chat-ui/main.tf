@@ -3,7 +3,9 @@
 # own API scope and lets in only the listed users (the deployer). The gateway is whichever the project provisions:
 # - LiteLLM (LITELLM_URL): the app calls it with a team's virtual key, and LiteLLM runs the MCP tools;
 # - API Management (APIM_MODELS_URL): the app calls it with the user's own token, and runs the MCP tools itself
-#   through it (CHAT_UI_MCP_SERVERS).
+#   through it (CHAT_UI_MCP_SERVERS);
+# - a Foundry hosted agent (CHAT_UI_FOUNDRY_AGENT): the app calls the agent with the user's Foundry token and forwards
+#   the user's gateway token; the agent runs its tools as the user. Admin consent for Foundry's API is granted here.
 
 data "azurerm_client_config" "current" {}
 
@@ -19,8 +21,8 @@ locals {
   app_name = "ca-chat-${local.token}"
   title    = coalesce(var.title, "Chat")
   # Which gateway the UI talks to follows from which gateway layer the project has; with both, API Management (a
-  # project can show a second gateway next to the one its app uses).
-  gateway       = var.apim_models_url != "" ? "apim" : "litellm"
+  # project can show a second gateway next to the one its app uses). A Foundry agent, when named, comes first.
+  gateway       = var.foundry_agent != "" ? "foundry" : var.apim_models_url != "" ? "apim" : "litellm"
   uses_team_key = local.gateway == "litellm"
   # With LiteLLM, the Key Vault secret with the team's key: it must exist before this layer is provisioned (README).
   litellm_key_secret_name = local.uses_team_key ? coalesce(var.litellm_key_secret_name, "litellm-key-chat-ui") : ""
@@ -97,4 +99,18 @@ resource "azurerm_role_assignment" "ui_team_key" {
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_user_assigned_identity.ui.principal_id
   principal_type       = "ServicePrincipal"
+}
+
+# Foundry mode: the browser asks for the user's token for Foundry's API (https://ai.azure.com/user_impersonation, the
+# "Azure Machine Learning Services" application). Tenant-wide admin consent, so that users see no consent prompt.
+data "azuread_service_principal" "foundry_api" {
+  count     = local.gateway == "foundry" ? 1 : 0
+  client_id = "18a66f5f-dbdf-4c17-9dd7-1634712a9cbe"
+}
+
+resource "azuread_service_principal_delegated_permission_grant" "foundry_api" {
+  count                                = local.gateway == "foundry" ? 1 : 0
+  service_principal_object_id          = azuread_service_principal.ui.object_id
+  resource_service_principal_object_id = data.azuread_service_principal.foundry_api[0].object_id
+  claim_values                         = ["user_impersonation"]
 }

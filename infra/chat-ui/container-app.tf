@@ -8,7 +8,7 @@ locals {
 
   ui_env = {
     CHAT_GATEWAY            = local.gateway
-    GATEWAY_URL             = local.gateway == "apim" ? var.apim_models_url : var.litellm_url
+    GATEWAY_URL             = local.gateway == "foundry" ? var.foundry_project_endpoint : local.gateway == "apim" ? var.apim_models_url : var.litellm_url
     CHAT_MODEL              = var.model
     UI_TENANT_ID            = data.azurerm_client_config.current.tenant_id
     UI_CLIENT_ID            = azuread_application.ui.client_id
@@ -27,6 +27,7 @@ locals {
       CHAT_INSTRUCTIONS = var.instructions
       GATEWAY_SCOPE     = local.gateway == "apim" ? var.apim_gateway_scope : var.gateway_scope
       MCP_SERVERS       = local.gateway == "apim" ? var.mcp_servers : ""
+      FOUNDRY_AGENT     = var.foundry_agent
     } : name => value if value != ""
   }
 }

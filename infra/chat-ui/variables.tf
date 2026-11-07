@@ -157,3 +157,20 @@ variable "instructions" {
   type        = string
   default     = ""
 }
+
+variable "foundry_agent" {
+  description = "A Foundry hosted agent the UI talks to instead of a gateway (CHAT_UI_FOUNDRY_AGENT): the agent's name in the project of foundry_project_endpoint. It acts for the user with the user's Foundry token and gateway token (gateway_scope, required then). Empty: a gateway mode."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.foundry_agent == "" || (var.foundry_project_endpoint != "" && startswith(var.gateway_scope, "api://"))
+    error_message = "With CHAT_UI_FOUNDRY_AGENT, FOUNDRY_PROJECT_ENDPOINT and CHAT_UI_GATEWAY_SCOPE are needed too."
+  }
+}
+
+variable "foundry_project_endpoint" {
+  description = "The Foundry project of foundry_agent (FOUNDRY_PROJECT_ENDPOINT, from the foundry-model layer)."
+  type        = string
+  default     = ""
+}

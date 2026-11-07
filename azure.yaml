@@ -49,10 +49,16 @@ infra:
           posix:
             shell: sh
             run: bash ./hooks/postprovision.sh
-    # Reads the team's LiteLLM key from Key Vault: create it before provisioning this layer (README).
+    # The chat UI, in Foundry mode: it talks to the travel assistant (CHAT_UI_FOUNDRY_AGENT, from the agents layer) as
+    # the signed-in user; its hook makes the gateway app pre-authorize it.
     - name: chat-ui
       path: infra/chat-ui
-      dependsOn: [azure-platform, foundry-model, litellm-gateway]
+      dependsOn: [azure-platform, foundry-model, litellm-gateway, entra-apps, agents]
+      hooks:
+        postprovision:
+          posix:
+            shell: sh
+            run: bash ../entra-apps/hooks/preauthorize-chat-ui.sh
 
 services:
   # The Foundry project of the foundry-model layer, for the agent services below.

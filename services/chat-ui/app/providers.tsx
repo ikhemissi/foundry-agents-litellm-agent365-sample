@@ -1,6 +1,7 @@
 "use client";
 // The signed-in part of the page: keeps fresh access tokens and shows the CopilotKit chat with the server's agent.
-// With a gateway scope, a second token (the same user's, for LiteLLM or API Management) goes in x-gateway-token.
+// Next to the sign-in token, the server may need more tokens of the same user (extraTokens), each in its own header:
+// for the gateway (LiteLLM or API Management) in x-gateway-token, and in Foundry mode for Foundry in x-foundry-token.
 
 import {
   AuthError, InteractionRequiredAuthError, InteractionStatus, type AccountInfo, type IPublicClientApplication,
@@ -14,11 +15,17 @@ import { toolCallRenderer } from "./tool-call";
 const agentId = "chat";
 const renderToolCalls = [toolCallRenderer];
 
-// Called right after sign-in. The sign-in popup already asked consent for the gateway (extraScopesToConsent), or the
-// gateway pre-authorizes this app, so the silent request normally succeeds. If Entra still wants an interaction, a
-// second popup is tried; browsers may block it (popup_window_error), and "Renew sign-in" starts over from a click.
-async function gatewayTokenAfterSignIn(instance: IPublicClientApplication, account: AccountInfo, gatewayScope: string) {
-  const request = { account, scopes: [gatewayScope] };
+// A token the server needs next to the sign-in token: the header it goes in, and the scope it is for.
+export interface ExtraToken {
+  header: string;
+  scope: string;
+}
+
+// Called right after sign-in. The sign-in popup already asked consent for these scopes (extraScopesToConsent), or their
+// API pre-authorizes this app, so the silent request normally succeeds. If Entra still wants an interaction, a second
+// popup is tried; browsers may block it (popup_window_error), and "Renew sign-in" starts over from a click.
+async function tokenAfterSignIn(instance: IPublicClientApplication, account: AccountInfo, scope: string) {
+  const request = { account, scopes: [scope] };
   try {
     return (await instance.acquireTokenSilent(request)).accessToken;
   } catch (cause) {
@@ -27,11 +34,12 @@ async function gatewayTokenAfterSignIn(instance: IPublicClientApplication, accou
   }
 }
 
-export function SignedInChat({ scope, gatewayScope }: { scope: string; gatewayScope?: string }) {
+export function SignedInChat({ scope, extraTokens }: { scope: string; extraTokens: ExtraToken[] }) {
   const { instance, accounts, inProgress } = useMsal();
   const account = accounts[0];
   const [token, setToken] = useState("");
-  const [gatewayToken, setGatewayToken] = useState("");
+  // The extra tokens, by header.
+  const [extra, setExtra] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [session, setSession] = useState(0);
   const refresh = useCallback(async () => {
@@ -39,18 +47,20 @@ export function SignedInChat({ scope, gatewayScope }: { scope: string; gatewaySc
     try {
       const result = await instance.acquireTokenSilent({ account, scopes: [scope] });
       setToken(result.accessToken);
-      if (gatewayScope) {
-        setGatewayToken((await instance.acquireTokenSilent({ account, scopes: [gatewayScope] })).accessToken);
+      const renewed: Record<string, string> = {};
+      for (const { header, scope: extraScope } of extraTokens) {
+        renewed[header] = (await instance.acquireTokenSilent({ account, scopes: [extraScope] })).accessToken;
       }
+      setExtra(renewed);
       setError("");
     } catch (cause) {
       setToken("");
-      setGatewayToken("");
+      setExtra({});
       setError(cause instanceof InteractionRequiredAuthError
         ? "Your sign-in needs attention. Select Renew sign-in to continue."
         : "Could not renew sign-in. Sign out and try again.");
     }
-  }, [account, instance, scope, gatewayScope]);
+  }, [account, instance, scope, extraTokens]);
   useEffect(() => {
     if (!account) return;
     // MSAL renews the token before it expires; checking every minute keeps the chat's headers current.
@@ -58,20 +68,21 @@ export function SignedInChat({ scope, gatewayScope }: { scope: string; gatewaySc
     const timer = window.setInterval(() => { void refresh(); }, 60_000);
     return () => { window.clearTimeout(start); window.clearInterval(timer); };
   }, [account, refresh]);
-  const headers = useMemo(() => {
-    const authorization = { Authorization: `Bearer ${token}` };
-    return gatewayToken ? { ...authorization, "x-gateway-token": gatewayToken } : authorization;
-  }, [token, gatewayToken]);
-  // The server refuses chat requests without the gateway token once it asks for one.
-  const ready = Boolean(token) && (!gatewayScope || Boolean(gatewayToken));
+  const headers = useMemo(() => ({ Authorization: `Bearer ${token}`, ...extra }), [token, extra]);
+  // The server refuses chat requests without the extra tokens it asks for.
+  const ready = Boolean(token) && extraTokens.every(({ header }) => Boolean(extra[header]));
   const signIn = () => {
-    // The gateway's consent is asked in the same popup: a second popup, opened after this one closes, is no longer
+    // The extra scopes' consent is asked in the same popup: a second popup, opened after this one closes, is no longer
     // tied to the user's click and browsers block it (popup_window_error).
-    const extraScopesToConsent = gatewayScope ? [gatewayScope] : undefined;
+    const extraScopesToConsent = extraTokens.length ? extraTokens.map((extraToken) => extraToken.scope) : undefined;
     instance.loginPopup({ scopes: [scope], extraScopesToConsent }).then(async (result) => {
       instance.setActiveAccount(result.account);
       setToken(result.accessToken);
-      if (gatewayScope) setGatewayToken(await gatewayTokenAfterSignIn(instance, result.account, gatewayScope));
+      const acquired: Record<string, string> = {};
+      for (const { header, scope: extraScope } of extraTokens) {
+        acquired[header] = await tokenAfterSignIn(instance, result.account, extraScope);
+      }
+      setExtra(acquired);
       setError("");
     }).catch((cause: unknown) => setError(
       `Microsoft sign-in could not be completed${cause instanceof AuthError ? ` (${cause.errorCode})` : ""}.`,
@@ -90,7 +101,7 @@ export function SignedInChat({ scope, gatewayScope }: { scope: string; gatewaySc
         <button onClick={() => setSession((value) => value + 1)}>New chat</button>{" "}
         <button onClick={() => {
           setToken("");
-          setGatewayToken("");
+          setExtra({});
           setSession((value) => value + 1);
           instance.logoutPopup({ account }).catch(() => setError("Sign-out could not be completed."));
         }}>Sign out</button>

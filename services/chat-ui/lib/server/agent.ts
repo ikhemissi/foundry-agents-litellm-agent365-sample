@@ -1,11 +1,13 @@
 // The chat's one agent ("chat"): sends the conversation to the gateway and streams back AG-UI events. With LiteLLM,
-// LiteLLM runs the MCP tools; with API Management, this server runs them (tool-loop.ts).
+// LiteLLM runs the MCP tools; with API Management, this server runs them (tool-loop.ts); with a Foundry hosted agent,
+// the agent runs its own tools as the user (foundry.ts).
 // Errors, including gateway refusals, are shown as a chat message and end the run with RUN_ERROR.
 import { AbstractAgent, EventType, type BaseEvent, type RunAgentInput } from "@ag-ui/client";
 import { Observable, type Subscriber } from "rxjs";
 import { z } from "zod";
 import type { ChatConfig } from "./config";
 import { ChatError, reportError } from "./errors";
+import { foundryToAgUiEvents, streamFoundryAgent } from "./foundry";
 import { streamLiteLLM } from "./litellm";
 import type { McpConnect } from "./mcp-tools";
 import type { ChatMessage } from "./responses-stream";
@@ -23,6 +25,8 @@ export interface InvocationContext {
   userId: string;
   // The signed-in user's token for the gateway, checked by the handler; only set when GATEWAY_SCOPE is.
   gatewayToken?: string;
+  // Foundry mode: the signed-in user's token for Foundry, checked by the handler.
+  foundryToken?: string;
   fetchImpl?: typeof fetch;
   // API Management mode only: how to reach an MCP server (tests stand in for the servers).
   connectMcp?: McpConnect;
@@ -79,9 +83,14 @@ export class GatewayAgent extends AbstractAgent {
     this.cancellation?.abort();
   }
 
-  // The one difference between the gateways: who runs the MCP tools.
+  // The one difference between the modes: who runs the MCP tools.
   private events(messages: ChatMessage[], signal: AbortSignal, runId: string): AsyncGenerator<BaseEvent> {
-    const { config, gatewayToken, fetchImpl, connectMcp } = this.context;
+    const { config, gatewayToken, foundryToken, fetchImpl, connectMcp } = this.context;
+    if (config.CHAT_GATEWAY === "foundry") {
+      if (!foundryToken || !gatewayToken) throw new ChatError("authentication", "missing_user_tokens", "Sign in again.", 401);
+      const stream = streamFoundryAgent({ config, messages, signal, foundryToken, gatewayToken, fetchImpl });
+      return foundryToAgUiEvents(stream, runId);
+    }
     if (config.CHAT_GATEWAY === "apim") {
       return runToolLoop({ config, messages, gatewayToken, signal, runId, fetchImpl, connectMcp });
     }

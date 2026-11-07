@@ -1,5 +1,6 @@
 // Reads and checks the server settings from the environment; publicConfig is the part the browser may see.
-// Two gateways: LiteLLM (it runs the MCP tools itself) or Azure API Management (a proxy: this server runs the tools).
+// Three modes (CHAT_GATEWAY): LiteLLM (it runs the MCP tools itself), Azure API Management (a proxy: this server runs
+// the tools), or a Foundry hosted agent (it runs its tools itself, acting for the user with the tokens forwarded to it).
 import { z } from "zod";
 
 const loopbackHosts = ["localhost", "127.0.0.1"];
@@ -27,8 +28,10 @@ const mcpServersSchema = z.string()
   })).min(1).refine((servers) => new Set(servers.map((server) => server.label)).size === servers.length, "Labels must be unique."));
 
 const commonSchema = z.object({
-  // litellm: LiteLLM's base URL; apim: API Management's OpenAI v1 base (…/openai/v1). See responsesUrl.
+  // litellm: LiteLLM's base URL; apim: API Management's OpenAI v1 base (…/openai/v1); foundry: the Foundry project
+  // endpoint (…/api/projects/<project>). See responsesUrl.
   GATEWAY_URL: z.string().url(),
+  // foundry: the model behind the agent, recorded on the run's span only.
   CHAT_MODEL: z.string().regex(/^[\w.:/-]+$/),
   UI_TENANT_ID: z.string().uuid(),
   UI_CLIENT_ID: z.string().uuid(),
@@ -60,11 +63,22 @@ const schema = z.discriminatedUnion("CHAT_GATEWAY", [
     GATEWAY_SCOPE: gatewayScopeSchema,
     MCP_SERVERS: mcpServersSchema,
   }),
+  // The hosted agent acts for the user: it gets the user's Foundry token and gateway token (GATEWAY_SCOPE), and this
+  // server never calls the gateway itself. CHAT_INSTRUCTIONS is not used: the agent has its own.
+  commonSchema.extend({
+    CHAT_GATEWAY: z.literal("foundry"),
+    GATEWAY_SCOPE: gatewayScopeSchema,
+    FOUNDRY_AGENT: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9-]{0,62}$/),
+  }),
 ]);
 
 export type ChatConfig = z.infer<typeof schema>;
 export type LiteLLMConfig = Extract<ChatConfig, { CHAT_GATEWAY: "litellm" }>;
 export type ApimConfig = Extract<ChatConfig, { CHAT_GATEWAY: "apim" }>;
+export type FoundryConfig = Extract<ChatConfig, { CHAT_GATEWAY: "foundry" }>;
+
+// The delegated scope of Foundry's API: the browser asks for it, and the hosted agent's endpoint accepts it.
+export const foundryScope = "https://ai.azure.com/user_impersonation";
 export type McpServerSetting = ApimConfig["MCP_SERVERS"][number];
 
 export function getConfig(env: Record<string, string | undefined> = process.env): ChatConfig {
@@ -85,9 +99,13 @@ export function getConfig(env: Record<string, string | undefined> = process.env)
   return { ...config, GATEWAY_URL: config.GATEWAY_URL.replace(/\/+$/, "") };
 }
 
-// The two gateways put the Responses API at different paths below GATEWAY_URL: LiteLLM serves it at /v1/responses
-// below its base URL, while API Management's OpenAI v1 API already ends in /openai/v1, so it is /responses there.
+// Each mode puts the Responses API at a different path below GATEWAY_URL: LiteLLM serves it at /v1/responses below its
+// base URL; API Management's OpenAI v1 API already ends in /openai/v1, so it is /responses there; a Foundry hosted
+// agent serves it at its own endpoint in the project.
 export function responsesUrl(config: ChatConfig): string {
+  if (config.CHAT_GATEWAY === "foundry") {
+    return `${config.GATEWAY_URL}/agents/${config.FOUNDRY_AGENT}/endpoint/protocols/openai/responses?api-version=v1`;
+  }
   return config.CHAT_GATEWAY === "apim" ? `${config.GATEWAY_URL}/responses` : `${config.GATEWAY_URL}/v1/responses`;
 }
 
@@ -111,5 +129,6 @@ export function publicConfig(config: ChatConfig) {
     title: config.CHAT_TITLE,
     intro: config.CHAT_INTRO,
     ...(config.GATEWAY_SCOPE ? { gatewayScope: config.GATEWAY_SCOPE } : {}),
+    ...(config.CHAT_GATEWAY === "foundry" ? { foundryScope } : {}),
   };
 }
