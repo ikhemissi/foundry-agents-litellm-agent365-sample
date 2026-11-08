@@ -105,7 +105,7 @@ The travel assistant refuses any request that does not carry the user's tokens (
 | [agents/travel-assistant](agents/travel-assistant) | The hosted agent (Python, Agent Framework): builds its tools for each request from the user's tokens ([main.py](agents/travel-assistant/main.py), [user_tokens.py](agents/travel-assistant/user_tokens.py), [a2a.py](agents/travel-assistant/a2a.py)) |
 | [agents/expense-policy](agents/expense-policy) | The prompt agent: its role ([agent.json](agents/expense-policy/agent.json)) and its skill ([skill/SKILL.md](agents/expense-policy/skill/SKILL.md), [skill/scripts/policy.py](agents/expense-policy/skill/scripts/policy.py)) |
 | [services/trips-mcp](services/trips-mcp) | The trips MCP server: each user's fictional trips and expenses; every tool call needs the user's token |
-| [services/chat-ui](services/chat-ui) | The chat (Next.js, CopilotKit, MSAL), in its Foundry mode |
+| [services/chat-ui](services/chat-ui) | The chat (Next.js, CopilotKit, MSAL), in its Foundry mode: it calls the travel assistant as the user, keeps one agent session per chat and shows each tool call as it happens ([services/chat-ui/README.md](services/chat-ui/README.md#foundry-mode)) |
 | [src](src) | LiteLLM configuration, the expense policy agent's deployment, a command-line client ([src/README.md](src/README.md)) |
 | [infra](infra) | One Terraform root per azd layer, in the order of [azure.yaml](azure.yaml); each layer's notes are at the top of its `main.tf` |
 
@@ -124,7 +124,7 @@ azd up
 
 If the quota check finds too little capacity for the model in your region, pick another deployment type or capacity before `azd up`, for example `azd env set MODEL_SKU GlobalStandard` (the default, `DataZoneStandard`, keeps data processing in the EU data zone) or `azd env set MODEL_CAPACITY 20`.
 
-`azd up` provisions the layers in the order of `azure.yaml`, then deploys the services. Along the way:
+`azd up` provisions the layers in the order of `azure.yaml`, one at a time (each layer depends on the one before it), then deploys the services. Along the way:
 
 - the `agents` layer's hook configures LiteLLM and deploys the expense policy agent ([src](src));
 - the travel assistant's postdeploy hook gives its identity read access to its own LiteLLM key and the right to publish telemetry;
@@ -158,6 +158,7 @@ Connect LiteLLM to Agent 365, then block and unblock tools: see [docs/agent365.m
 - **A user token on every MCP call.** The Agent 365 guardrail evaluates each MCP tool call as the user, and LiteLLM's open-source edition applies guardrails to every key alike. So every MCP call through LiteLLM carries a user token, and the expense policy agent, which acts as itself, calls no MCP server.
 - **The user's token reaches the trips server.** LiteLLM passes the user's gateway token on unchanged (`oauth_delegate`), and the trips server checks it (tenant, the gateway app's audience, the `Tools.Use` scope) before any tool runs. Discovery (`initialize`, `tools/list`) needs no token, so that Agent 365 can list the tools with its own key; tool definitions hold no user data. LiteLLM's On-Behalf-Of exchange (`oauth2_token_exchange`) would give the trips server a token of its own audience, but it then needs a user token for discovery as well, which Agent 365 does not send.
 - **Credentials.** Users and agents act with Entra tokens: the users' own tokens, managed identities for the services (LiteLLM to the models, the trips MCP server to its storage), and the travel assistant's agent identity (to Key Vault and Application Insights). Each agent's LiteLLM key is kept in Key Vault, and the expense policy agent's in a project connection. The one client secret, the gateway app's (for the Agent 365 guardrail's On-Behalf-Of exchange), is kept in Key Vault and in LiteLLM's database.
+- **A responsive chat.** A new hosted-agent session starts a container, which takes a few seconds. The chat starts the agent's session as soon as a chat opens and reuses it for every message of that chat (`agent_session_id`), so answers do not wait for it; tool calls are shown as soon as the agent reports them, since a question to the expense policy agent over A2A takes a few seconds.
 
 Versions used (November 2026): LiteLLM v1.106.6, Microsoft Agent Framework 1.22, MCP Python SDK 2.3, CopilotKit 1.79, azd 1.37 with the Foundry extensions 1.0, model `gpt-6-luna`.
 
