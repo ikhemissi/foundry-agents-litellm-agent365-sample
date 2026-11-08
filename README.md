@@ -118,11 +118,13 @@ az login && azd auth login
 azd extension install azure.ai.agents azure.ai.projects   # or: azd extension upgrade …
 azd env new <name> --location francecentral
 azd env set RESOURCE_TAGS "key=value"            # optional: tags your organisation's policies require
-azd hooks run preprovision                       # creates the remote Terraform state
+azd hooks run preprovision                       # remote Terraform state, model quota check
 azd up
 ```
 
-`azd up` provisions the layers in the order of `azure.yaml` (the foundry-model layer checks the model's quota first), then deploys the services. Along the way:
+If the quota check finds too little capacity for the model in your region, pick another deployment type or capacity before `azd up`, for example `azd env set MODEL_SKU GlobalStandard` (the default, `DataZoneStandard`, keeps data processing in the EU data zone) or `azd env set MODEL_CAPACITY 20`.
+
+`azd up` provisions the layers in the order of `azure.yaml`, then deploys the services. Along the way:
 
 - the `agents` layer's hook configures LiteLLM and deploys the expense policy agent ([src](src));
 - the travel assistant's postdeploy hook gives its identity read access to its own LiteLLM key and the right to publish telemetry;

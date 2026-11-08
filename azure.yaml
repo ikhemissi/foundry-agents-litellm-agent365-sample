@@ -7,7 +7,8 @@ requiredVersions:
     azure.ai.projects: ">= 1.0.0"
 
 # One Terraform root per layer (infra/<layer>/), provisioned in this order; layers pass values through the azd
-# environment.
+# environment. Each layer also depends on the one before it, so that they run one at a time: with azd 1.37, Terraform
+# layers provisioned in parallel by `azd up` could collide on each other's local state lock.
 infra:
   provider: terraform
   layers:
@@ -23,7 +24,7 @@ infra:
             run: bash ./hooks/preprovision.sh
     - name: postgres
       path: infra/postgres
-      dependsOn: [azure-platform]
+      dependsOn: [azure-platform, foundry-model]
     - name: litellm-gateway
       path: infra/litellm-gateway
       dependsOn: [azure-platform, foundry-model, postgres]
@@ -32,11 +33,11 @@ infra:
           posix:
             shell: sh
             run: bash ./hooks/postprovision.sh
-    # The gateway's and the trips API's app registrations (needs a Global or Privileged Role Administrator).
+    # The gateway's app registration and the Agent 365 consent (needs a Global or Privileged Role Administrator).
     - name: entra-apps
       path: infra/entra-apps
-      dependsOn: [azure-platform]
-    # Each user's trips; internal ingress (LiteLLM), user tokens for the trips API only.
+      dependsOn: [azure-platform, litellm-gateway]
+    # Each user's trips; internal ingress (LiteLLM); tool calls need the user's token for the gateway app.
     - name: trips-mcp
       path: infra/trips-mcp
       dependsOn: [azure-platform, entra-apps]
