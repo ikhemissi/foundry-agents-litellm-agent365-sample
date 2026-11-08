@@ -87,7 +87,7 @@ export async function verifyGatewayToken(
   return token;
 }
 
-// Foundry mode: the hosted agent's endpoint and the expense policy agent (over A2A, through the gateway) act for whoever
+// Foundry mode: the hosted agent's endpoint and the agents it calls (over A2A, through the gateway) act for whoever
 // this token names, so it too must be a delegated token this chat obtained for the signed-in user. Foundry's API
 // (https://ai.azure.com) issues v1 tokens: the issuer is sts.windows.net and the client is in appid.
 export async function verifyFoundryToken(

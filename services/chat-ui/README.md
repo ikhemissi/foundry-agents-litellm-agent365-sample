@@ -283,7 +283,8 @@ notes MCP server, for "add a note, then list notes":
 **Failures:**
 
 - **A tool that fails is still `status: completed`, with `error: null`.** The error is only in `output`: the notes
-  server's own error gives `"Error executing tool list_notes"` (checked live with `limit: 500`); in LiteLLM's source
+  server's own error gave `"Error executing tool list_notes"` (checked live with `limit: 500`; with the MCP Python SDK
+  2.3, a server's own message follows only when the tool raises `ToolError`: `"Error executing tool list_notes: …"`); in LiteLLM's source
   (`litellm/responses/mcp/litellm_proxy_mcp_handler.py` at v1.106.6) a guardrail block gives `"Tool call blocked: …"`,
   a gateway `HTTPException` gives `"Tool call failed: …"`, and other exceptions `"Error executing tool: …"`. The app
   treats these prefixes (or a non-empty `error`, or `status: failed`) as an error result.
