@@ -111,7 +111,7 @@ The travel assistant refuses any request that does not carry the user's tokens (
 
 ## Deploy
 
-You need an Azure subscription, the rights to create app registrations and grant tenant-wide admin consent (Global Administrator or Privileged Role Administrator), the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli), [azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) 1.37 or later with the Foundry extensions 1.0 or later, Terraform 1.9 or later, [uv](https://docs.astral.sh/uv/), and Node.js 22 for local checks of the chat UI. Agent 365 must be available in your tenant for the governance part.
+You need an Azure subscription, the right to create app registrations, and a role that can grant tenant-wide admin consent to APIs other than Microsoft Graph, such as Cloud Application Administrator, Application Administrator or AI Administrator (needed again by `azd down` to remove the two consents; the app registrations, which you own, and the Azure resources need no directory role), the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli), [azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) 1.37 or later with the Foundry extensions 1.0 or later, Terraform 1.9 or later, [uv](https://docs.astral.sh/uv/), and Node.js 22 for local checks of the chat UI. Agent 365 must be available in your tenant for the governance part.
 
 ```bash
 az login && azd auth login

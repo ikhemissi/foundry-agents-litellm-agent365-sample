@@ -33,7 +33,7 @@ infra:
           posix:
             shell: sh
             run: bash ./hooks/postprovision.sh
-    # The gateway's app registration and the Agent 365 consent (needs a Global or Privileged Role Administrator).
+    # The gateway's app registration and the Agent 365 consent (needs e.g. a Cloud Application Administrator).
     - name: entra-apps
       path: infra/entra-apps
       dependsOn: [azure-platform, litellm-gateway]

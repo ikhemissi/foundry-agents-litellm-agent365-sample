@@ -3,7 +3,8 @@
 # - LiteLLM passes it on unchanged to the trips MCP server (oauth_delegate), which checks it and acts for that user;
 # - LiteLLM's agent_365 guardrail exchanges it On-Behalf-Of the user, with this app's client secret, for an Agent 365
 #   token, so that Agent 365 evaluates each tool call as the user. That exchange needs tenant-wide admin consent,
-#   granted here: provisioning this layer needs a Global Administrator or a Privileged Role Administrator.
+#   granted here: provisioning or destroying this layer needs a role that can grant consent to APIs other than
+#   Microsoft Graph, such as Cloud Application Administrator, Application Administrator or AI Administrator.
 
 data "azurerm_client_config" "current" {}
 
@@ -13,9 +14,6 @@ locals {
   agent365_app_id  = "ea9ffc3e-8a23-4a7d-836d-234d7c7565c1"
   agent365_scope   = "ThreatProtection.Evaluate.All"
   azure_cli_app_id = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
-  # Clients that may ask for a gateway token without a consent prompt: the Azure CLI (tests) and the chat UI, once
-  # its layer exists (CHAT_UI_CLIENT_ID; this layer is provisioned again after it).
-  preauthorized_clients = compact([local.azure_cli_app_id, var.chat_ui_client_id])
 }
 
 # Fails the plan if the tenant has no Agent 365 service principal: the guardrail cannot work there.
@@ -70,11 +68,23 @@ resource "azuread_service_principal" "gateway" {
   owners    = [data.azurerm_client_config.current.object_id]
 }
 
-resource "azuread_application_pre_authorized" "clients" {
-  for_each             = toset(local.preauthorized_clients)
+# Clients that may ask for a gateway token without a consent prompt: the Azure CLI (src/ask_travel_assistant.py) and
+# the chat UI, once its layer exists (CHAT_UI_CLIENT_ID; its hook provisions this layer again). One at a time: Graph
+# rewrites an application's whole list of pre-authorized clients on each change, so two changes made in parallel can
+# collide (for example on `azd down`, after the chat UI's app is deleted).
+resource "azuread_application_pre_authorized" "azure_cli" {
   application_id       = azuread_application.gateway.id
-  authorized_client_id = each.value
+  authorized_client_id = local.azure_cli_app_id
   permission_ids       = [random_uuid.gateway_scope.result]
+}
+
+resource "azuread_application_pre_authorized" "chat_ui" {
+  count                = var.chat_ui_client_id != "" ? 1 : 0
+  application_id       = azuread_application.gateway.id
+  authorized_client_id = var.chat_ui_client_id
+  permission_ids       = [random_uuid.gateway_scope.result]
+
+  depends_on = [azuread_application_pre_authorized.azure_cli]
 }
 
 # Tenant-wide admin consent for the guardrail's On-Behalf-Of exchange.
