@@ -7,7 +7,7 @@ This repository is a **sample**: a working, documented example of Microsoft Foun
 - **Travel assistant** (`agents/travel-assistant`): a Foundry **hosted** agent (Agent Framework). It acts **as the signed-in user** towards the trips MCP server (through LiteLLM) and the expense policy agent (A2A 1.0 through LiteLLM), and uses its own LiteLLM key for the model.
 - **Expense policy agent** (`agents/expense-policy`): a Foundry **prompt** agent, the A2A 1.0 target. Its policy is a skill in the open Agent Skills format (`skill/SKILL.md` as instructions, `skill/scripts/policy.py` run by the code interpreter, so every figure is computed by code). It uses its own LiteLLM key for its model and calls no MCP server. Deployed by `src/deploy_policy_agent.py`.
 - **Trips MCP server** (`services/trips-mcp`): Contoso's fictional trips, per user.
-- **LiteLLM** (`infra/litellm-gateway`, configured by `src/configure_gateway.py`): one key per agent, the trips MCP server (the user's token passed on: `oauth_delegate`), the A2A agent, the Agent 365 guardrail on every MCP call (so every MCP call needs a user token).
+- **LiteLLM** (`infra/litellm-gateway.tf`, configured by `src/configure_gateway.py`): one key per agent, the trips MCP server (the user's token passed on: `oauth_delegate`), the A2A agent, the Agent 365 guardrail on every MCP call (so every MCP call needs a user token).
 - **Agent 365** governs the MCP servers LiteLLM exposes (discovery, block and unblock, per tool) and evaluates each tool call as the user (guardrail).
 
 ## Rules
@@ -21,10 +21,11 @@ This repository is a **sample**: a working, documented example of Microsoft Foun
 
 ## Infrastructure
 
-- **Layers:** `azure.yaml` lists the azd layers (`infra/<layer>/`, one Terraform root and state each) in provisioning order. `infra/azure-platform`, `infra/foundry-model`, `infra/postgres`, `infra/litellm-gateway` and `infra/chat-ui` come from shared building blocks: keep them as they are, so that their improvements can be merged in later. The sample's own layers: `infra/entra-apps`, `infra/trips-mcp`, `infra/agents`.
+- **One Terraform root** (`infra/`, one state): `main.tf` holds names, tags and the resource group; every other file is one part of the architecture, calling a module of `infra/modules` and wiring it to the others through their outputs. Its outputs become azd values. Modules manage one Azure concern each, receive shared resources as inputs, and stay free of sample specifics, so that they can be copied as they are; sample-specific values belong in the files of `infra/`.
+- **Hooks** (`infra/hooks/`, project level in `azure.yaml`) run what Terraform cannot, as a short list of steps calling `infra/scripts/`.
 - **Gateway settings** (MCP servers, A2A agents, keys, guardrails) go through LiteLLM's admin API (`src/configure_gateway.py`), not into its configuration file.
-- **Checks:** in `services/trips-mcp`: `uvx ruff check . && uv run --no-project --with-requirements requirements.txt --with-requirements requirements-dev.txt pytest`; in `agents/travel-assistant`: the same with `--python 3.13`; in `agents/expense-policy`: `uvx ruff check . && uv run --no-project --with-requirements requirements-dev.txt pytest`; in `src`: `uvx ruff check .`; in `services/chat-ui`: `npm ci && npm run typecheck && npm run lint && npm test && npm run build`; for a layer: `terraform -chdir=infra/<layer> init -backend=false && terraform -chdir=infra/<layer> validate`.
-- **Before every `azd provision`:** `azd hooks run preprovision`, then `azd provision <layer> --preview` for each layer you change (azd previews one layer at a time), and read the plan.
+- **Checks:** in `services/trips-mcp`: `uvx ruff check . && uv run --no-project --with-requirements requirements.txt --with-requirements requirements-dev.txt pytest`; in `agents/travel-assistant`: the same with `--python 3.13`; in `agents/expense-policy`: `uvx ruff check . && uv run --no-project --with-requirements requirements-dev.txt pytest`; in `src`: `uvx ruff check .`; in `services/chat-ui`: `npm ci && npm run typecheck && npm run lint && npm test && npm run build`; for the infrastructure: `terraform -chdir=infra init -backend=false && terraform -chdir=infra validate`, and in each `infra/modules/<module>`: `terraform init -backend=false && terraform test`.
+- **Before every `azd provision`:** `azd hooks run preprovision`, then `azd provision --preview`, and read the plan.
 
 ## Code humans can maintain
 

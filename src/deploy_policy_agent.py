@@ -1,6 +1,6 @@
 """Deploys Contoso's expense policy agent, a Foundry prompt agent, with the stable Foundry REST API (api-version v1).
-Idempotent; reads the azd environment and uses your Azure CLI sign-in. Never prints a key. Run by the agents layer's
-postprovision hook, after src/configure_gateway.py (which creates the agent's LiteLLM key), or:
+Idempotent; reads the azd environment and uses your Azure CLI sign-in. Never prints a key. Run by the postprovision
+hook, after src/configure_gateway.py (which creates the agent's LiteLLM key), or:
     uv run python src/deploy_policy_agent.py
 
 1. A project connection, litellm (ModelGateway), holds the agent's own LiteLLM key, so that it never appears in the
@@ -12,7 +12,7 @@ postprovision hook, after src/configure_gateway.py (which creates the agent's Li
    with the policy's code, so that every figure it states is computed by that code. A new version only when this
    definition changed.
 4. Its endpoint: Responses and A2A, for Entra callers (the user's Foundry token, which LiteLLM passes on). Callers
-   need the Foundry Agent Consumer role on the project (the agents layer gives it to the deployer).
+   need the Foundry Agent Consumer role on the project (infra/agents.tf gives it to the deployer).
 """
 
 import hashlib
@@ -172,7 +172,7 @@ def enable_a2a(values: dict) -> None:
 
 def main() -> None:
     values = {**azd_values(), **os.environ}
-    key = read_secret(values["PLATFORM_KEY_VAULT_NAME"], POLICY_AGENT_KEY_SECRET)
+    key = read_secret(values["KEY_VAULT_NAME"], POLICY_AGENT_KEY_SECRET)
     if not key:
         raise SystemExit("The expense policy agent's LiteLLM key is missing: run src/configure_gateway.py first.")
     ensure_model_connection(values, key)

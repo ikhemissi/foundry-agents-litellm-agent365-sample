@@ -1,5 +1,5 @@
 """Configures LiteLLM for the sample, through its admin API. Idempotent; reads the azd environment and uses your Azure
-CLI sign-in (Key Vault Secrets Officer). Never prints a key. Run by the agents layer's postprovision hook, or:
+CLI sign-in (Key Vault Secrets Officer). Never prints a key. Run by the postprovision hook, or:
     uv run python src/configure_gateway.py
 
 - The MCP server Contoso_Trips (the name Agent 365 shows): LiteLLM passes the caller's token for the gateway app on
@@ -166,7 +166,7 @@ def ensure_agent365_key(admin: Gateway, vault: str) -> None:
 
 def main() -> None:
     values = {**azd_values(), **os.environ}
-    vault = values["PLATFORM_KEY_VAULT_NAME"]
+    vault = values["KEY_VAULT_NAME"]
     admin_key = read_secret(vault, values["LITELLM_MASTER_KEY_SECRET_NAME"])
     gateway_secret = read_secret(vault, values["GATEWAY_SECRET_NAME"])
     if not admin_key or not gateway_secret:

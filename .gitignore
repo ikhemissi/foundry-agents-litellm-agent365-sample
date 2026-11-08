@@ -11,3 +11,5 @@ __pycache__/
 *.pfx
 # Local files from fast-start, never committed
 .fast-start/
+# Lock files of the modules exist only for their tests; the root's (infra/.terraform.lock.hcl) is committed.
+infra/modules/*/.terraform.lock.hcl

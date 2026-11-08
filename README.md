@@ -8,7 +8,7 @@ A working sample of two **Microsoft Foundry** agents that work together through 
 - a **prompt agent** reached over **A2A 1.0**, whose policy is a skill in the open **Agent Skills** format, computed by code in the **code interpreter**;
 - models, an **MCP** server and the A2A agent, all **through LiteLLM**, with one key per agent;
 - **Agent 365** discovers the MCP tools LiteLLM exposes, blocks and unblocks them, and evaluates every tool call as the user;
-- a **CopilotKit** chat (**AG-UI**), **OpenTelemetry** to Application Insights, and infrastructure as **Terraform** layers deployed with **azd**.
+- a **CopilotKit** chat (**AG-UI**), **OpenTelemetry** to Application Insights, and infrastructure as one **Terraform** root, built from small reusable modules and deployed with **azd**.
 
 The scenario is fictional: Contoso's **travel assistant** reads an employee's trips and files their expenses, after asking Contoso's **expense policy agent** whether each expense fits the policy.
 
@@ -107,7 +107,7 @@ The travel assistant refuses any request that does not carry the user's tokens (
 | [services/trips-mcp](services/trips-mcp) | The trips MCP server: each user's fictional trips and expenses; every tool call needs the user's token |
 | [services/chat-ui](services/chat-ui) | The chat (Next.js, CopilotKit, MSAL), in its Foundry mode: it calls the travel assistant as the user, keeps one agent session per chat and shows each tool call as it happens ([services/chat-ui/README.md](services/chat-ui/README.md#foundry-mode)) |
 | [src](src) | LiteLLM configuration, the expense policy agent's deployment, a command-line client ([src/README.md](src/README.md)) |
-| [infra](infra) | One Terraform root per azd layer, in the order of [azure.yaml](azure.yaml); each layer's notes are at the top of its `main.tf` |
+| [infra](infra) | One Terraform root: one file per part of the architecture ([foundry.tf](infra/foundry.tf), [litellm-gateway.tf](infra/litellm-gateway.tf), [trips-mcp.tf](infra/trips-mcp.tf), …), each calling a module of [infra/modules](infra/modules) and wiring it to the others; the hooks and scripts azd runs before and after Terraform are in [infra/hooks](infra/hooks) and [infra/scripts](infra/scripts) |
 
 ## Deploy
 
@@ -124,15 +124,15 @@ azd up
 
 If the quota check finds too little capacity for the model in your region, pick another deployment type or capacity before `azd up`, for example `azd env set MODEL_SKU GlobalStandard` (the default, `DataZoneStandard`, keeps data processing in the EU data zone) or `azd env set MODEL_CAPACITY 20`.
 
-`azd up` provisions the layers in the order of `azure.yaml`, one at a time (each layer depends on the one before it), then deploys the services. Along the way:
+`azd up` provisions the infrastructure (one Terraform plan), then deploys the services. Along the way, its hooks ([infra/hooks](infra/hooks)):
 
-- the `agents` layer's hook configures LiteLLM and deploys the expense policy agent ([src](src));
-- the travel assistant's postdeploy hook gives its identity read access to its own LiteLLM key and the right to publish telemetry;
-- the chat-ui layer's hook pre-authorizes the chat on the gateway app.
+- give LiteLLM's identity its database role, configure LiteLLM and deploy the expense policy agent ([src](src)), after provisioning;
+- give the travel assistant's identity read access to its own LiteLLM key and the right to publish telemetry, after it is deployed;
+- provision once more after the first deployment, so that the container apps switch from their placeholder image's port to their own.
 
-To change an environment later, preview each layer you change and read its plan before applying it: `azd provision <layer> --preview`, then `azd provision <layer>`.
+To change an environment later, read the plan before applying it: `azd provision --preview`, then `azd provision`.
 
-Open the chat: `azd env get-value CHAT_UI_URL`. Only the user who deployed is allowed in (the chat layer's `ALLOWED_USER_OBJECT_IDS`), with the Foundry Agent Consumer role on the project (given by the `agents` layer).
+Open the chat: `azd env get-value CHAT_UI_URL`. Only the user who deployed is allowed in (`ALLOWED_USER_OBJECT_IDS` in [chat-ui.tf](infra/chat-ui.tf)), with the Foundry Agent Consumer role on the project ([agents.tf](infra/agents.tf)).
 
 Without the chat:
 
@@ -174,7 +174,7 @@ done
 azd down --purge
 ```
 
-`azd down --purge` deletes the resource group and purges the Key Vault and the Foundry account. The app registrations created by the `entra-apps` and `chat-ui` layers are deleted with their layers. Remove the LiteLLM gateway from Agent 365 (Gateways) too.
+`azd down --purge` deletes the resource group and purges the Key Vault and the Foundry account. The two app registrations (the gateway's and the chat's) are deleted with the rest. Remove the LiteLLM gateway from Agent 365 (Gateways) too.
 
 ## License
 

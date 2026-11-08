@@ -8,7 +8,7 @@ Agent 365 connects to LiteLLM with a dedicated proxy-admin key, which `src/confi
 
 ```bash
 azd env get-value LITELLM_URL
-az keyvault secret show --vault-name "$(azd env get-value PLATFORM_KEY_VAULT_NAME)" -n agent365-gateway-key --query value -o tsv
+az keyvault secret show --vault-name "$(azd env get-value KEY_VAULT_NAME)" -n agent365-gateway-key --query value -o tsv
 ```
 
 In the Microsoft 365 admin center, open the Agent 365 gateway settings, add a LiteLLM gateway with that URL and key, and wait for its MCP server to appear in the tools: `Contoso_Trips`, with `list_trips`, `get_trip` and `add_expense`. Agent 365 lists the tools with its key only; the trips server answers discovery without a user token.

@@ -24,7 +24,7 @@ def access_token(*scope_args: str) -> str:
 def ask(question: str) -> dict:
     values = azd_values()
     foundry_token = access_token("--resource", "https://ai.azure.com")
-    gateway_token = access_token("--scope", values["CHAT_UI_GATEWAY_SCOPE"])
+    gateway_token = access_token("--scope", values["GATEWAY_SCOPE"])
     url = f"{values['FOUNDRY_PROJECT_ENDPOINT']}/agents/{AGENT}/endpoint/protocols/openai/responses?api-version=v1"
     request = urllib.request.Request(
         url,

@@ -6,63 +6,13 @@ requiredVersions:
     azure.ai.agents: ">= 1.0.0"
     azure.ai.projects: ">= 1.0.0"
 
-# One Terraform root per layer (infra/<layer>/), provisioned in this order; layers pass values through the azd
-# environment. Each layer also depends on the one before it, so that they run one at a time: with azd 1.37, Terraform
-# layers provisioned in parallel by `azd up` could collide on each other's local state lock.
+# One Terraform root (infra/): each file is one part of the architecture, built from the modules in infra/modules.
 infra:
   provider: terraform
-  layers:
-    - name: azure-platform
-      path: infra/azure-platform
-    - name: foundry-model
-      path: infra/foundry-model
-      dependsOn: [azure-platform]
-      hooks:
-        preprovision:
-          posix:
-            shell: sh
-            run: bash ./hooks/preprovision.sh
-    - name: postgres
-      path: infra/postgres
-      dependsOn: [azure-platform, foundry-model]
-    - name: litellm-gateway
-      path: infra/litellm-gateway
-      dependsOn: [azure-platform, foundry-model, postgres]
-      hooks:
-        postprovision:
-          posix:
-            shell: sh
-            run: bash ./hooks/postprovision.sh
-    # The gateway's app registration and the Agent 365 consent (needs e.g. a Cloud Application Administrator).
-    - name: entra-apps
-      path: infra/entra-apps
-      dependsOn: [azure-platform, litellm-gateway]
-    # Each user's trips; internal ingress (LiteLLM); tool calls need the user's token for the gateway app.
-    - name: trips-mcp
-      path: infra/trips-mcp
-      dependsOn: [azure-platform, entra-apps]
-    # The deployer's Foundry Agent Consumer role; its hook configures LiteLLM and deploys the expense policy agent.
-    - name: agents
-      path: infra/agents
-      dependsOn: [foundry-model, litellm-gateway, entra-apps, trips-mcp]
-      hooks:
-        postprovision:
-          posix:
-            shell: sh
-            run: bash ./hooks/postprovision.sh
-    # The chat UI, in Foundry mode: it talks to the travel assistant (CHAT_UI_FOUNDRY_AGENT, from the agents layer) as
-    # the signed-in user; its hook makes the gateway app pre-authorize it.
-    - name: chat-ui
-      path: infra/chat-ui
-      dependsOn: [azure-platform, foundry-model, litellm-gateway, entra-apps, agents]
-      hooks:
-        postprovision:
-          posix:
-            shell: sh
-            run: bash ../entra-apps/hooks/preauthorize-chat-ui.sh
+  path: infra
 
 services:
-  # The Foundry project of the foundry-model layer, for the agent services below.
+  # The Foundry project (infra/foundry.tf), for the agent services below.
   foundry-project:
     host: azure.ai.project
     endpoint: ${FOUNDRY_PROJECT_ENDPOINT}
@@ -85,12 +35,12 @@ services:
         version: 2.0.0
     env:
       LITELLM_URL: ${LITELLM_URL}
-      KEY_VAULT_URI: ${PLATFORM_KEY_VAULT_URI}
+      KEY_VAULT_URI: ${KEY_VAULT_URI}
       LITELLM_KEY_SECRET_NAME: litellm-key-travel-assistant
       MODEL: ${FOUNDRY_MODEL_DEPLOYMENT_NAME}
       TRIPS_MCP_SERVER: Contoso_Trips
       EXPENSE_POLICY_A2A_AGENT: expense_policy_agent
-      APPLICATIONINSIGHTS_CONNECTION_STRING: ${PLATFORM_APPLICATION_INSIGHTS_CONNECTION_STRING}
+      APPLICATIONINSIGHTS_CONNECTION_STRING: ${APPLICATIONINSIGHTS_CONNECTION_STRING}
       OTEL_SERVICE_NAME: travel-assistant
     container:
       resources:
@@ -100,7 +50,7 @@ services:
       postdeploy:
         posix:
           shell: sh
-          run: bash ../../infra/agents/hooks/grant-travel-assistant.sh
+          run: bash ../../infra/scripts/grant-travel-assistant.sh
   trips-mcp:
     project: ./services/trips-mcp
     language: python
@@ -109,11 +59,6 @@ services:
       path: ./Dockerfile
       # Images are built in the platform's registry: no local Docker needed to deploy.
       remoteBuild: true
-    hooks:
-      postdeploy:
-        posix:
-          shell: sh
-          run: bash ../../infra/trips-mcp/hooks/postdeploy.sh
   chat-ui:
     project: ./services/chat-ui
     language: ts
@@ -122,22 +67,30 @@ services:
       path: ./Dockerfile
       # Images are built in the platform's registry: no local Docker needed to deploy.
       remoteBuild: true
-    hooks:
-      postdeploy:
-        posix:
-          shell: sh
-          run: bash ../../infra/chat-ui/hooks/postdeploy.sh
 
+# Project-level hooks (infra/hooks/): what Terraform cannot do, before and after it runs.
 hooks:
   preprovision:
     posix:
       shell: sh
-      run: bash ./infra/azure-platform/hooks/preprovision.sh
+      run: bash ./infra/hooks/preprovision.sh
+      interactive: false
+      continueOnError: false
+  postprovision:
+    posix:
+      shell: sh
+      run: bash ./infra/hooks/postprovision.sh
+      interactive: false
+      continueOnError: false
+  postdeploy:
+    posix:
+      shell: sh
+      run: bash ./infra/hooks/postdeploy.sh
       interactive: false
       continueOnError: false
   predown:
     posix:
       shell: sh
-      run: bash ./infra/azure-platform/hooks/predown.sh
+      run: bash ./infra/hooks/predown.sh
       interactive: false
       continueOnError: false

@@ -187,7 +187,7 @@ own tools as the signed-in user. This server never calls the gateway.
 
 - The browser asks for two more tokens of the same user: for the gateway (`GATEWAY_SCOPE`, required) and for Foundry
   (`https://ai.azure.com/user_impersonation`), sent in `x-gateway-token` and `x-foundry-token`. The chat's app
-  registration needs consent for Foundry's API (the chat-ui layer grants it tenant-wide).
+  registration needs consent for Foundry's API (the infrastructure grants it tenant-wide).
 - The server checks both like the sign-in token: delegated, asked by this chat, for the signed-in user. Foundry's API
   issues v1 tokens (issuer `https://sts.windows.net/{tenant}/`, audience `https://ai.azure.com`, client in `appid`).
 - It calls `{GATEWAY_URL}/agents/{FOUNDRY_AGENT}/endpoint/protocols/openai/responses?api-version=v1` with the Foundry
@@ -217,7 +217,7 @@ npm run dev                   # http://localhost:3000
 To fill `LITELLM_API_KEY` (LiteLLM mode) without printing it, from the repository root:
 
 ```bash
-echo "LITELLM_API_KEY=$(az keyvault secret show --vault-name "$(azd env get-value PLATFORM_KEY_VAULT_NAME)" \
+echo "LITELLM_API_KEY=$(az keyvault secret show --vault-name "$(azd env get-value KEY_VAULT_NAME)" \
   -n "$(azd env get-value CHAT_UI_LITELLM_KEY_SECRET_NAME)" --query value -o tsv)" >> services/chat-ui/.env.local
 ```
 
