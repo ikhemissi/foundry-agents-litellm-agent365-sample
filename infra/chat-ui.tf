@@ -1,7 +1,9 @@
 # The chat UI (services/chat-ui, deployed by azd): a public container app where signed-in users chat with the travel
-# assistant. Users sign in with Entra (MSAL in the browser); the app checks their tokens for its own API scope and lets
-# in only the listed users (the deployer). It calls the agent with the user's Foundry token and forwards the user's
-# gateway token, so that the agent acts as the user.
+# assistant. Who may use it is one Entra group, "Contoso travel assistant users (<environment>)": only its members can
+# sign in (the app requires an app role assignment, given to the group), and the group has the role to call the agents
+# (agents.tf). The deployer is a member; share the chat by adding people to the group. The app checks each user's token
+# for its own API scope, then calls the agent with the user's Foundry token and forwards the user's gateway token, so
+# that the agent acts as the user.
 
 variable "chat_ui_image" {
   description = "The image azd deployed (SERVICE_CHAT_UI_IMAGE_NAME). Empty before the first deployment."
@@ -18,6 +20,21 @@ locals {
 }
 
 resource "random_uuid" "chat_ui_scope" {}
+
+resource "random_uuid" "chat_ui_user_role" {}
+
+resource "azuread_group" "chat_users" {
+  display_name     = "Contoso travel assistant users (${var.environment_name})"
+  description      = "Who may use the Contoso travel assistant chat of the ${var.environment_name} environment."
+  security_enabled = true
+  owners           = [data.azurerm_client_config.current.object_id]
+}
+
+# Only the deployer is managed here: members added later (portal, az ad group member add) are left as they are.
+resource "azuread_group_member" "deployer" {
+  group_object_id  = azuread_group.chat_users.object_id
+  member_object_id = data.azurerm_client_config.current.object_id
+}
 
 # One app registration: the single-page application users sign in to, and the API scope its server checks.
 resource "azuread_application" "chat_ui" {
@@ -38,6 +55,15 @@ resource "azuread_application" "chat_ui" {
       user_consent_display_name  = "Use the chat"
       user_consent_description   = "Allows the chat to call its server on your behalf."
     }
+  }
+
+  app_role {
+    id                   = random_uuid.chat_ui_user_role.result
+    value                = "Chat.User"
+    display_name         = "Chat user"
+    description          = "May sign in to the chat."
+    allowed_member_types = ["User"]
+    enabled              = true
   }
 
   lifecycle {
@@ -61,6 +87,14 @@ resource "azuread_application_redirect_uris" "chat_ui" {
 resource "azuread_service_principal" "chat_ui" {
   client_id = azuread_application.chat_ui.client_id
   owners    = [data.azurerm_client_config.current.object_id]
+  # Entra lets only users assigned to the app (the group's members) sign in.
+  app_role_assignment_required = true
+}
+
+resource "azuread_app_role_assignment" "chat_users" {
+  app_role_id         = random_uuid.chat_ui_user_role.result
+  principal_object_id = azuread_group.chat_users.object_id
+  resource_object_id  = azuread_service_principal.chat_ui.object_id
 }
 
 # Tenant-wide admin consent for the user's Foundry token, so that users see no consent prompt.
@@ -93,18 +127,17 @@ module "chat_ui" {
   application_insights_connection_string = module.monitoring.application_insights_connection_string
 
   env = {
-    CHAT_GATEWAY            = "foundry"
-    GATEWAY_URL             = module.foundry.project_endpoint
-    FOUNDRY_AGENT           = "travel-assistant"
-    GATEWAY_SCOPE           = "${azuread_application_identifier_uri.gateway.identifier_uri}/${local.gateway_scope}"
-    CHAT_MODEL              = module.foundry.model_deployment_name
-    CHAT_TITLE              = "Contoso travel assistant"
-    CHAT_INTRO              = "A Foundry hosted agent that acts for you: it reads your trips and files expenses through LiteLLM (MCP, governed by Agent 365), and asks Contoso's expense policy agent over A2A 1.0. Each tool call is shown under the answer."
-    UI_TENANT_ID            = data.azurerm_client_config.current.tenant_id
-    UI_CLIENT_ID            = azuread_application.chat_ui.client_id
-    UI_SCOPE                = local.chat_ui_scope
-    UI_ORIGIN               = local.chat_ui_origin
-    ALLOWED_USER_OBJECT_IDS = data.azurerm_client_config.current.object_id
+    CHAT_GATEWAY  = "foundry"
+    GATEWAY_URL   = module.foundry.project_endpoint
+    FOUNDRY_AGENT = "travel-assistant"
+    GATEWAY_SCOPE = "${azuread_application_identifier_uri.gateway.identifier_uri}/${local.gateway_scope}"
+    CHAT_MODEL    = module.foundry.model_deployment_name
+    CHAT_TITLE    = "Contoso travel assistant"
+    CHAT_INTRO    = "A Foundry hosted agent that acts for you: it reads your trips and files expenses through LiteLLM (MCP, governed by Agent 365), and asks Contoso's expense policy agent over A2A 1.0. Each tool call is shown under the answer."
+    UI_TENANT_ID  = data.azurerm_client_config.current.tenant_id
+    UI_CLIENT_ID  = azuread_application.chat_ui.client_id
+    UI_SCOPE      = local.chat_ui_scope
+    UI_ORIGIN     = local.chat_ui_origin
   }
 
   role_assignments = {
@@ -113,3 +146,4 @@ module "chat_ui" {
 }
 
 output "CHAT_UI_URL" { value = module.chat_ui.url }
+output "CHAT_USERS_GROUP_ID" { value = azuread_group.chat_users.object_id }

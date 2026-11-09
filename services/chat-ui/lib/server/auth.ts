@@ -46,7 +46,8 @@ export async function authenticate(
   if (!delegated) {
     throw new ChatError("authentication", "invalid_delegation", "A delegated token from this chat's sign-in is required.", 403);
   }
-  if (typeof claims.oid !== "string" || !config.ALLOWED_USER_OBJECT_IDS.includes(claims.oid)) {
+  const allowedUsers = config.ALLOWED_USER_OBJECT_IDS;
+  if (typeof claims.oid !== "string" || (allowedUsers !== undefined && !allowedUsers.includes(claims.oid))) {
     throw new ChatError("authentication", "user_not_allowed", "This user is not allowed to use the chat.", 403);
   }
   return { oid: claims.oid, tid: config.UI_TENANT_ID };

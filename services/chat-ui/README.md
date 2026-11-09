@@ -86,7 +86,7 @@ the app shows what LiteLLM reports. The team key stays on the server. With API M
 | `UI_CLIENT_ID` | yes | The app registration used both as the SPA and as the API (GUID) |
 | `UI_SCOPE` | no, `Chat.Use` | The delegated scope the API exposes; the browser asks for `api://{UI_CLIENT_ID}/{UI_SCOPE}` |
 | `UI_ORIGIN` | no, `http://localhost:3000` | The page's origin: HTTPS, or `http://localhost` / `http://127.0.0.1` for development |
-| `ALLOWED_USER_OBJECT_IDS` | yes | Comma-separated user object ids (GUIDs) allowed to chat |
+| `ALLOWED_USER_OBJECT_IDS` | no | Comma-separated user object ids (GUIDs) allowed to chat. Without it, every user who can sign in to the app registration may chat: limit who can sign in with Entra instead (an app role assignment required on the app, e.g. for a group) |
 | `GATEWAY_SCOPE` | `apim` only | The gateway app registration's delegated scope, `api://{gateway app id}/{scope}`: the browser gets the user's own token for it. `litellm`: optional, only when LiteLLM runs the Agent 365 guardrail (see [Agent 365 guardrail](#agent-365-guardrail)); `apim`: required, it is the credential for every call to API Management |
 | `FOUNDRY_AGENT` | `foundry` only | The hosted agent's name in the project, e.g. `travel-assistant` |
 | `MCP_SERVERS` | `apim` only | The MCP servers API Management exposes: comma-separated `label=url`, e.g. `notes=https://<apim>.azure-api.net/notes/mcp,files=…`. Label `^[a-z][a-z0-9_]{0,30}$`, unique (it prefixes the tool names: `notes-add_note`); URL HTTPS without credentials, query or fragment |
@@ -100,7 +100,7 @@ the app shows what LiteLLM reports. The team key stays on the server. With API M
 
 **Sign-in rules** (`/api/copilotkit`): a `Bearer` token signed RS256 by the tenant (`https://login.microsoftonline.com/{tenant}/v2.0`),
 audience `UI_CLIENT_ID`, with `exp`, `iat`, `oid`, `tid`, `azp` and `scp`; `tid` is the tenant, `azp` is `UI_CLIENT_ID`,
-the token is delegated (no `idtyp: app`), `scp` contains `UI_SCOPE`, and `oid` is in `ALLOWED_USER_OBJECT_IDS`.
+the token is delegated (no `idtyp: app`), `scp` contains `UI_SCOPE`, and `oid` is in `ALLOWED_USER_OBJECT_IDS` when it is set.
 Otherwise 401 (no or invalid token) or 403 (wrong caller, scope or user). The app registration needs the SPA redirect
 URI `{UI_ORIGIN}/auth/callback` and the exposed scope.
 

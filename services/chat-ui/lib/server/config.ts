@@ -37,9 +37,12 @@ const commonSchema = z.object({
   UI_CLIENT_ID: z.string().uuid(),
   UI_SCOPE: z.string().regex(/^[a-zA-Z][a-zA-Z0-9._]*$/).default("Chat.Use"),
   UI_ORIGIN: z.string().url().default("http://localhost:3000"),
+  // Optional: only these users may chat. Without it, every user who can sign in to the chat's app registration may;
+  // limit who can sign in with Entra (an app role assignment required on the app, e.g. for a group).
   ALLOWED_USER_OBJECT_IDS: z.string()
     .transform((value) => value.split(",").map((item) => item.trim()).filter(Boolean))
-    .pipe(z.array(z.string().uuid()).min(1)),
+    .pipe(z.array(z.string().uuid()).min(1))
+    .optional(),
   // The user's own token for the gateway is asked for: api://<gateway app id>/<scope name>.
   // Optional with LiteLLM (only for the Agent 365 guardrail), required with API Management.
   GATEWAY_SCOPE: gatewayScopeSchema.optional(),

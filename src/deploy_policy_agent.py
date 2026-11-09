@@ -12,7 +12,7 @@ hook, after src/configure_gateway.py (which creates the agent's LiteLLM key), or
    with the policy's code, so that every figure it states is computed by that code. A new version only when this
    definition changed.
 4. Its endpoint: Responses and A2A, for Entra callers (the user's Foundry token, which LiteLLM passes on). Callers
-   need the Foundry Agent Consumer role on the project (infra/agents.tf gives it to the deployer).
+   need the Foundry Agent Consumer role on the project (infra/agents.tf gives it to the chat's users).
 """
 
 import hashlib

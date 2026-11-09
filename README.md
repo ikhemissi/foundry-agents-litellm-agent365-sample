@@ -111,7 +111,7 @@ The travel assistant refuses any request that does not carry the user's tokens (
 
 ## Deploy
 
-You need an Azure subscription, the right to create app registrations, and a role that can grant tenant-wide admin consent to APIs other than Microsoft Graph, such as Cloud Application Administrator, Application Administrator or AI Administrator (needed again by `azd down` to remove the two consents; the app registrations, which you own, and the Azure resources need no directory role), the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli), [azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) 1.37 or later with the Foundry extensions 1.0 or later, Terraform 1.9 or later, [uv](https://docs.astral.sh/uv/), and Node.js 22 for local checks of the chat UI. Agent 365 must be available in your tenant for the governance part.
+You need an Azure subscription, the right to create app registrations and security groups, and a role that can grant tenant-wide admin consent to APIs other than Microsoft Graph, such as Cloud Application Administrator, Application Administrator or AI Administrator (needed again by `azd down` to remove the two consents; the app registrations, which you own, and the Azure resources need no directory role), the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli), [azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) 1.37 or later with the Foundry extensions 1.0 or later, Terraform 1.9 or later, [uv](https://docs.astral.sh/uv/), and Node.js 22 for local checks of the chat UI. Assigning a group to the chat's app needs Microsoft Entra ID P1 or P2. Agent 365 must be available in your tenant for the governance part.
 
 ```bash
 az login && azd auth login
@@ -132,7 +132,15 @@ If the quota check finds too little capacity for the model in your region, pick 
 
 To change an environment later, read the plan before applying it: `azd provision --preview`, then `azd provision`.
 
-Open the chat: `azd env get-value CHAT_UI_URL`. Only the user who deployed is allowed in (`ALLOWED_USER_OBJECT_IDS` in [chat-ui.tf](infra/chat-ui.tf)), with the Foundry Agent Consumer role on the project ([agents.tf](infra/agents.tf)).
+Open the chat: `azd env get-value CHAT_UI_URL`.
+
+**Share the chat** by adding people to the Entra group *Contoso travel assistant users (<environment>)*, of which you are a member and the owner:
+
+```bash
+az ad group member add --group "$(azd env get-value CHAT_USERS_GROUP_ID)" --member-id <user object id>
+```
+
+Only the group's members can sign in to the chat ([chat-ui.tf](infra/chat-ui.tf)), and the group has the Foundry Agent Consumer role on the project, which lets its members call the agents with their own token ([agents.tf](infra/agents.tf)). A new member can use the chat after a few minutes, once the role applies to them.
 
 Without the chat:
 
