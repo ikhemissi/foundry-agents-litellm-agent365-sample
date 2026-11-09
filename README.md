@@ -1,6 +1,26 @@
+<div align="center">
+
 # Foundry agents with LiteLLM, governed by Agent 365
 
+**Two Microsoft Foundry agents that act as the signed-in user over MCP and A2A 1.0, through a LiteLLM gateway, with the tools governed by Microsoft Agent 365. Deployed with one `azd up`.**
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
+[![IaC: Terraform](https://img.shields.io/badge/IaC-Terraform-623CE4?style=flat-square&logo=terraform)](infra)
+[![Deploy: azd](https://img.shields.io/badge/deploy-azd-0078D4?style=flat-square)](azure.yaml)
+[![Protocol: MCP](https://img.shields.io/badge/protocol-MCP-555555?style=flat-square)](services/trips-mcp)
+[![Protocol: A2A 1.0](https://img.shields.io/badge/protocol-A2A%201.0-555555?style=flat-square)](agents/expense-policy)
+
+[**Quick start**](#quick-start) · [**Architecture**](#architecture) · [**Who acts on each call**](#who-acts-on-each-call) · [**Cost**](#cost) · [**Documentation**](#documentation)
+
+</div>
+
 ![Foundry agents with LiteLLM, governed by Agent 365: a chat talks to a Foundry hosted agent acting as the user, which reaches an MCP server and, over A2A 1.0, a Foundry prompt agent through a LiteLLM gateway that Agent 365 governs](docs/overview.svg)
+
+## Why this sample
+
+Agents become useful when they act for a person: they read that person's data, file their expenses, and ask other agents on their behalf. Every such call raises three questions: whose identity does it carry, which gateway sees it, and who can stop a tool that should not run. This sample answers them with open protocols and one gateway. The user's own tokens travel on every hop, every model, MCP and A2A call goes through LiteLLM, and Agent 365 governs the tools from one place.
+
+## What it shows
 
 A working sample of two **Microsoft Foundry** agents that work together through a **LiteLLM** gateway, using open protocols end to end, with **Microsoft Agent 365** governing the tools:
 
@@ -109,9 +129,24 @@ The travel assistant refuses any request that does not carry the user's tokens (
 | [src](src) | LiteLLM configuration, the expense policy agent's deployment, a command-line client ([src/README.md](src/README.md)) |
 | [infra](infra) | One Terraform root: one file per part of the architecture ([foundry.tf](infra/foundry.tf), [litellm-gateway.tf](infra/litellm-gateway.tf), [trips-mcp.tf](infra/trips-mcp.tf), …), each calling a module of [infra/modules](infra/modules) and wiring it to the others; the hooks and scripts azd runs before and after Terraform are in [infra/hooks](infra/hooks) and [infra/scripts](infra/scripts) |
 
-## Deploy
+## Quick start
 
-You need an Azure subscription, the right to create app registrations and security groups, and a role that can grant tenant-wide admin consent to APIs other than Microsoft Graph, such as Cloud Application Administrator, Application Administrator or AI Administrator (needed again by `azd down` to remove the two consents; the app registrations and the group, which you own, and the Azure resources need no directory role), the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli), [azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) 1.37 or later with the Foundry extensions 1.0 or later, Terraform 1.9 or later, [uv](https://docs.astral.sh/uv/), and Node.js 22 for local checks of the chat UI. Assigning a group to the chat's app needs Microsoft Entra ID P1 or P2. Agent 365 must be available in your tenant for the governance part.
+### 1. Prerequisites
+
+- An Azure subscription.
+- In its Microsoft Entra tenant:
+  - the right to create app registrations and security groups;
+  - a role that can grant tenant-wide admin consent to APIs other than Microsoft Graph, such as Cloud Application Administrator, Application Administrator or AI Administrator. `azd down` needs it again to remove the two consents. The app registrations and the group, which you own, and the Azure resources need no directory role.
+- Microsoft Entra ID P1 or P2, to assign a group to the chat's app.
+- Agent 365 in your tenant, for the governance part.
+- Tools:
+  - the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli);
+  - [azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) 1.37 or later, with the Foundry extensions 1.0 or later;
+  - Terraform 1.9 or later;
+  - [uv](https://docs.astral.sh/uv/);
+  - Node.js 22, only for local checks of the chat UI.
+
+### 2. Deploy
 
 ```bash
 az login && azd auth login
@@ -119,12 +154,13 @@ azd extension install azure.ai.agents azure.ai.projects   # or: azd extension up
 azd env new <name> --location francecentral
 azd env set RESOURCE_TAGS "key=value"            # optional: tags your organisation's policies require
 azd hooks run preprovision                       # remote Terraform state, model quota check
+azd provision --preview                          # read the plan
 azd up
 ```
 
-If the quota check finds too little capacity for the model in your region, pick another deployment type or capacity before `azd up`, for example `azd env set MODEL_SKU GlobalStandard` (the default, `DataZoneStandard`, keeps data processing in the EU data zone) or `azd env set MODEL_CAPACITY 20`.
+If the quota check finds too little capacity for the model in your region, pick another deployment type or capacity before `azd up`. For example, `azd env set MODEL_SKU GlobalStandard` (the default, `DataZoneStandard`, keeps data processing in the EU data zone) or `azd env set MODEL_CAPACITY 20`.
 
-`azd up` provisions the infrastructure (one Terraform plan), then deploys the services. Along the way, its hooks ([infra/hooks](infra/hooks)):
+`azd up` provisions the infrastructure (one Terraform plan), then deploys the services, in about 25 minutes. Along the way, its hooks ([infra/hooks](infra/hooks)):
 
 - give LiteLLM's identity its database role, configure LiteLLM and deploy the expense policy agent ([src](src)), after provisioning;
 - give the travel assistant's identity read access to its own LiteLLM key and the right to publish telemetry, after it is deployed;
@@ -132,23 +168,25 @@ If the quota check finds too little capacity for the model in your region, pick 
 
 To change an environment later, read the plan before applying it: `azd provision --preview`, then `azd provision`.
 
-Open the chat: `azd env get-value CHAT_UI_URL`.
+### 3. Open and share the chat
 
-**Share the chat** by adding people to the Entra group *Contoso travel assistant users (<environment>)*, of which you are a member and the owner:
+Open the chat at `azd env get-value CHAT_UI_URL`.
+
+To share it, add people to the Entra group *Contoso travel assistant users (<environment>)*, of which you are a member and the owner:
 
 ```bash
 az ad group member add --group "$(azd env get-value CHAT_USERS_GROUP_ID)" --member-id <user object id>
 ```
 
-Only the group's members can sign in to the chat ([chat-ui.tf](infra/chat-ui.tf)), and the group has the Foundry Agent Consumer role on the project, which lets its members call the agents with their own token ([agents.tf](infra/agents.tf)). A new member can use the chat after a few minutes, once the role applies to them.
+Only the group's members can sign in to the chat ([chat-ui.tf](infra/chat-ui.tf)). The group has the Foundry Agent Consumer role on the project, which lets its members call the agents with their own token ([agents.tf](infra/agents.tf)). A new member can use the chat after a few minutes, once the role applies to them.
 
-Without the chat:
+To try it without the chat:
 
 ```bash
 uv run python src/ask_travel_assistant.py "What are my upcoming trips?"
 ```
 
-## Govern with Agent 365
+### 4. Govern with Agent 365
 
 Connect LiteLLM to Agent 365, then block and unblock tools: see [docs/agent365.md](docs/agent365.md).
 
@@ -168,7 +206,33 @@ Connect LiteLLM to Agent 365, then block and unblock tools: see [docs/agent365.m
 - **Credentials.** Users and agents act with Entra tokens: the users' own tokens, managed identities for the services (LiteLLM to the models, the trips MCP server to its storage), and the travel assistant's agent identity (to Key Vault and Application Insights). Each agent's LiteLLM key is kept in Key Vault, and the expense policy agent's in a project connection. The one client secret, the gateway app's (for the Agent 365 guardrail's On-Behalf-Of exchange), is kept in Key Vault and in LiteLLM's database.
 - **A responsive chat.** A new hosted-agent session starts a container, which takes a few seconds. The chat starts the agent's session as soon as a chat opens and reuses it for every message of that chat (`agent_session_id`), so answers do not wait for it; tool calls are shown as soon as the agent reports them, since a question to the expense policy agent over A2A takes a few seconds.
 
-Versions used (November 2026): LiteLLM v1.106.6, Microsoft Agent Framework 1.22, MCP Python SDK 2.3, CopilotKit 1.79, azd 1.37 with the Foundry extensions 1.0, model `gpt-6-luna`.
+## Tech stack
+
+Versions used in November 2026:
+
+| Technology | Role | Version |
+|---|---|---|
+| [Microsoft Foundry](https://learn.microsoft.com/azure/ai-foundry/) | The project, the model, the hosted agent and the prompt agent | model `gpt-6-luna` |
+| [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) | The travel assistant (Python) | 1.22 |
+| [LiteLLM](https://github.com/BerriAI/litellm) | The gateway for models, MCP and A2A, with the `agent_365` guardrail | v1.106.6 |
+| [Microsoft Agent 365](https://learn.microsoft.com/microsoft-agent-365/) | Discovers, blocks and evaluates the MCP tools | |
+| [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) | The trips MCP server | 2.3 |
+| [A2A](https://a2a-protocol.org) | Between the travel assistant and the expense policy agent | 1.0 |
+| [CopilotKit](https://www.copilotkit.ai) (AG-UI), [Next.js](https://nextjs.org), [MSAL](https://github.com/AzureAD/microsoft-authentication-library-for-js) | The chat | 1.79, 16.4, 5.25 |
+| [OpenTelemetry](https://opentelemetry.io) and [Application Insights](https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview) | Traces and metrics of the chat, the travel assistant and LiteLLM | |
+| [Terraform](https://www.terraform.io) and [azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/) | The infrastructure and its deployment | Terraform 1.9+, azd 1.37 with the Foundry extensions 1.0 |
+| Azure Container Apps, Azure Database for PostgreSQL, Key Vault, Container Registry, Table storage | LiteLLM, the trips MCP server and the chat, LiteLLM's database, the secrets, the images, the trips | PostgreSQL 18 |
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [docs/agent365.md](docs/agent365.md) | Connect LiteLLM to Agent 365, then block and unblock a tool |
+| [services/chat-ui/README.md](services/chat-ui/README.md) | The chat: settings, sign-in rules, and its Foundry mode |
+| [src/README.md](src/README.md) | The scripts that configure LiteLLM, deploy the expense policy agent, and ask the travel assistant from the command line |
+| [infra/modules/README.md](infra/modules/README.md) | The Terraform modules, their inputs for a virtual network, and their tests |
+| [agents/expense-policy/skill/SKILL.md](agents/expense-policy/skill/SKILL.md) | The expense policy skill, in the open Agent Skills format |
+| [AGENTS.md](AGENTS.md) | How to change the sample: rules, checks, conventions |
 
 ## Clean up
 
