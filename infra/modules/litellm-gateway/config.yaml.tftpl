@@ -1,6 +1,6 @@
-# LiteLLM proxy configuration, rendered by Terraform (main.tf, templatefile) with the model of the foundry-model layer.
+# LiteLLM proxy configuration, rendered by Terraform (main.tf, templatefile) with the model deployment given to the module.
 # Everything else a project needs (MCP servers, teams, virtual keys, guardrails) is created through the admin API or UI
-# and kept in the database: change this file only for settings every project of this block should get.
+# and kept in the database: change this file only for settings every gateway built with this module should get.
 
 model_list:
   - model_name: ${model_deployment_name}
