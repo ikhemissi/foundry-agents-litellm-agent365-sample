@@ -4,6 +4,7 @@
 
 **Two Microsoft Foundry agents that act as the signed-in user over MCP and A2A 1.0, through a LiteLLM gateway, with the tools governed by Microsoft Agent 365. Deployed with one `azd up`.**
 
+[![CI](https://github.com/ikhemissi/foundry-agents-litellm-agent365-sample/actions/workflows/ci.yml/badge.svg)](https://github.com/ikhemissi/foundry-agents-litellm-agent365-sample/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
 [![IaC: Terraform](https://img.shields.io/badge/IaC-Terraform-623CE4?style=flat-square&logo=terraform)](infra)
 [![Deploy: azd](https://img.shields.io/badge/deploy-azd-0078D4?style=flat-square)](azure.yaml)
@@ -237,6 +238,7 @@ Versions used in November 2026:
 | [infra/modules/README.md](infra/modules/README.md) | The Terraform modules, their inputs for a virtual network, and their tests |
 | [agents/expense-policy/skill/SKILL.md](agents/expense-policy/skill/SKILL.md) | The expense policy skill, in the open Agent Skills format |
 | [AGENTS.md](AGENTS.md) | How to change the sample: rules, checks, conventions |
+| [SECURITY.md](SECURITY.md) | How to report a vulnerability, and how to use the sample safely |
 
 ## Versions and preview notes
 

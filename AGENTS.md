@@ -17,14 +17,13 @@ This repository is a **sample**: a working, documented example of Microsoft Foun
 - **Identity on every hop is part of the sample:** a change that alters which identity reaches a service updates the identity table in the README.
 - **Ask before deciding** anything that changes the design, the scope or the behaviour; propose a default.
 - **Commits:** conventional commits (`feat(agents): …`, `fix(infra): …`, `docs: …`), ending with the trailer `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`.
-- **Spec-driven:** larger changes start as an OpenSpec change (`/opsx-propose`), see `openspec/`.
 
 ## Infrastructure
 
 - **One Terraform root** (`infra/`, one state): `main.tf` holds names, tags and the resource group; every other file is one part of the architecture, calling a module of `infra/modules` and wiring it to the others through their outputs. Its outputs become azd values. Modules manage one Azure concern each, receive shared resources as inputs, and stay free of sample specifics, so that they can be copied as they are; sample-specific values belong in the files of `infra/`.
 - **Hooks** (`infra/hooks/`, project level in `azure.yaml`) run what Terraform cannot, as a short list of steps calling `infra/scripts/`.
 - **Gateway settings** (MCP servers, A2A agents, keys, guardrails) go through LiteLLM's admin API (`src/configure_gateway.py`), not into its configuration file.
-- **Checks:** in `services/trips-mcp`: `uvx ruff check . && uv run --no-project --with-requirements requirements.txt --with-requirements requirements-dev.txt pytest`; in `agents/travel-assistant`: the same with `--python 3.13`; in `agents/expense-policy`: `uvx ruff check . && uv run --no-project --with-requirements requirements-dev.txt pytest`; in `src`: `uvx ruff check .`; in `services/chat-ui`: `npm ci && npm run typecheck && npm run lint && npm test && npm run build`; for the infrastructure: `terraform -chdir=infra init -backend=false && terraform -chdir=infra validate`, and in each `infra/modules/<module>`: `terraform init -backend=false && terraform test`.
+- **Checks** (CI runs them on every push and pull request: `.github/workflows/ci.yml`): in `services/trips-mcp`: `uvx ruff check . && uv run --no-project --with-requirements requirements.txt --with-requirements requirements-dev.txt pytest`; in `agents/travel-assistant`: the same with `--python 3.13`; in `agents/expense-policy`: `uvx ruff check . && uv run --no-project --with-requirements requirements-dev.txt pytest`; in `src`: `uvx ruff check .`; in `services/chat-ui`: `npm ci && npm run typecheck && npm run lint && npm test && npm run build`; for the infrastructure: `terraform -chdir=infra init -backend=false && terraform -chdir=infra validate`, and in each `infra/modules/<module>`: `terraform init -backend=false && terraform test`; for the hooks and scripts: `shellcheck -x infra/hooks/*.sh infra/scripts/*.sh`.
 - **Before every `azd provision`:** `azd hooks run preprovision`, then `azd provision --preview`, and read the plan.
 
 ## Code humans can maintain
