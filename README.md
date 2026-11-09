@@ -42,9 +42,9 @@ The scenario is fictional: Contoso's **travel assistant** reads an employee's tr
 
 Then *"Please file the dinner"* files it on your trip with `Contoso_Trips-add_expense`. When an administrator blocks `add_expense` in Agent 365, the gateway stops offering it within seconds: the assistant still checks the policy but can no longer file expenses, until the tool is unblocked ([Govern with Agent 365](docs/agent365.md)).
 
-| Filing an expense | The same request with `add_expense` blocked in Agent 365 |
+| Filing an expense | A similar request, with `add_expense` blocked in Agent 365 |
 |---|---|
-| ![The chat: the user asks to file a 20 EUR taxi on their Paris trip; the tool calls Contoso_Trips-list_trips, ask_expense_policy and Contoso_Trips-add_expense are shown as done, and the assistant confirms the expense is filed and within policy](docs/chat.png) | ![The chat: the user asks to file a 36 EUR taxi; only list_trips and ask_expense_policy run, and the assistant answers that the expense-filing tool is not available, while the policy agent says the taxi is within policy](docs/agent365-block.png) |
+| ![The chat: the user asks to file a 20 EUR taxi on their Paris trip; the tool calls Contoso_Trips-list_trips, ask_expense_policy and Contoso_Trips-add_expense are shown as done, and the assistant confirms the expense is filed and within policy](docs/chat.png) | ![The chat: the user asks to file a 36 EUR taxi on their Paris trip; only list_trips and ask_expense_policy run, and the assistant answers that the expense-filing tool is not available, while the policy agent says the taxi is within policy](docs/agent365-block.png) |
 
 ## Architecture
 
