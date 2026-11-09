@@ -184,6 +184,31 @@ azd down --purge
 
 `azd down --purge` deletes the resource group and purges the Key Vault and the Foundry account. The two app registrations (the gateway's and the chat's) and the chat users' group are deleted with the rest. Remove the LiteLLM gateway from Agent 365 (Gateways) too.
 
+## Cost
+
+Running the sample costs about **$2.50 a day, or $75 a month**, and most of it is billed whether or not anyone uses it. The figures below are list prices in France Central, in US dollars, from the [Azure Retail Prices API](https://learn.microsoft.com/rest/api/cost-management/retail-prices/azure-retail-prices) on 2026-11-09. A deployment left idle for a full day was billed $2.53 for its resources.
+
+| Resource | Per day | Per month | What drives it |
+|---|---:|---:|---|
+| Azure Container Apps: LiteLLM (with its telemetry collector), the trips MCP server and the chat, one replica each, 2 vCPU and 4 GiB in total | $1.56 | $47.30 | Always on, at the idle rate between requests |
+| Azure Database for PostgreSQL: Burstable B1ms, 32 GiB of storage | $0.60 | $18.13 | Always on |
+| Azure Container Registry: Basic | $0.17 | $5.07 | Always on |
+| Log Analytics: about 0.07 GB of logs and traces a day | $0 to $0.19 | $0 to $5.88 | The first 5 GB a month of a billing account are included, then $2.76 per GB |
+| Foundry: the travel assistant's sessions (0.5 vCPU, 1 GiB) | | | $0.07 per hour a session runs |
+| Foundry: the model, `gpt-6-luna` (Data Zone Standard) | | | $0.12 per million input tokens, $0.60 per million output tokens |
+| Key Vault, Table storage, the Terraform state | under $0.01 | under $0.30 | Per operation and per GB stored |
+
+Using the sample adds little to that:
+- **An hour of conversations** costs about $0.25 at most: the travel assistant's session, the container apps at their active rate, and the model's tokens.
+- **A full day of testing** used $0.03 of model tokens.
+- **Image builds** in the registry, when deploying, cost $0.25 on the day of the first deployment.
+
+These costs are not included:
+- Microsoft 365 and Agent 365 licences, and Microsoft Entra ID P1 or P2.
+- Microsoft Defender for Cloud plans enabled on the subscription, which are billed per resource ($0.43 a day on the subscription used for the measurement).
+
+To stop all charges, delete the environment ([Clean up](#clean-up)).
+
 ## License
 
 [MIT](LICENSE)
