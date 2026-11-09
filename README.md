@@ -137,7 +137,7 @@ The travel assistant refuses any request that does not carry the user's tokens (
 - In its Microsoft Entra tenant:
   - the right to create app registrations and security groups;
   - a role that can grant tenant-wide admin consent to APIs other than Microsoft Graph, such as Cloud Application Administrator, Application Administrator or AI Administrator. `azd down` needs it again to remove the two consents. The app registrations and the group, which you own, and the Azure resources need no directory role.
-- Microsoft Entra ID P1 or P2, to assign a group to the chat's app.
+- Microsoft Entra ID P1 or P2: only the members of a group can sign in to the chat, and assigning a group to an application needs one of these licences.
 - Agent 365 in your tenant, for the governance part.
 - Tools:
   - the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli);
@@ -233,6 +233,15 @@ Versions used in November 2026:
 | [infra/modules/README.md](infra/modules/README.md) | The Terraform modules, their inputs for a virtual network, and their tests |
 | [agents/expense-policy/skill/SKILL.md](agents/expense-policy/skill/SKILL.md) | The expense policy skill, in the open Agent Skills format |
 | [AGENTS.md](AGENTS.md) | How to change the sample: rules, checks, conventions |
+
+## Versions and preview notes
+
+As of November 2026:
+
+- The travel assistant is hosted with `agent-framework-foundry-hosting` 1.0.0b261015, a pre-release package.
+- LiteLLM is connected to Agent 365 in the Microsoft 365 admin center (Agents → Settings → Gateways), a setting in preview.
+- Agent 365 must be available in your tenant, and so must Microsoft Entra ID P1 or P2: access to the chat is given to a group, and assigning a group (rather than individual users) to an application needs one of these licences ([Prerequisites](#1-prerequisites)).
+- The model and its capacity depend on the region: the preprovision hook checks them before anything is deployed.
 
 ## Clean up
 
