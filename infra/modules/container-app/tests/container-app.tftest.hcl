@@ -51,3 +51,21 @@ run "after_the_first_deployment" {
     error_message = "Telemetry is configured when a connection string is given."
   }
 }
+
+run "a_secret_from_key_vault" {
+  command = plan
+
+  variables {
+    key_vault_secrets = { LITELLM_API_KEY = "https://kv-test.vault.azure.net/secrets/litellm-key-chat-ui" }
+  }
+
+  assert {
+    condition     = one(azurerm_container_app.main.secret).key_vault_secret_id == "https://kv-test.vault.azure.net/secrets/litellm-key-chat-ui"
+    error_message = "The secret is a Key Vault reference, not a value."
+  }
+  assert {
+    condition     = one([for env in azurerm_container_app.main.template[0].container[0].env : env.secret_name if env.name == "LITELLM_API_KEY"]) == "litellm-api-key"
+    error_message = "The variable reads the app's secret."
+  }
+}
+

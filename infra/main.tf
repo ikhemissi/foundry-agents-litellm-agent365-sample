@@ -1,6 +1,6 @@
-# The sample's infrastructure is this one Terraform root: each file is one part of the architecture (README), calling a
-# module of infra/modules and wiring it to the other parts through their outputs. This file holds what every part
-# shares: names, tags and the resource group. Outputs become azd environment values, read by the services, the hooks
+# The project's infrastructure is this one Terraform root: each file is one part of the architecture, calling a module
+# of infra/modules and wiring it to the other parts through their outputs. This file holds what every part shares:
+# names, tags and the resource group. Outputs become azd environment values, read by the services, the hooks
 # and the scripts; none of them is a secret.
 
 variable "environment_name" {
@@ -42,13 +42,6 @@ locals {
     for pair in local.extra_tag_pairs : trimspace(pair[0]) => trimspace(join("=", slice(pair, 1, length(pair))))
   }
   tags = merge(local.extra_tags, { "azd-env-name" = var.environment_name })
-
-  # No virtual network: every service is reached over its public endpoint, with Entra authentication. To use one, add
-  # a network.tf that calls modules/network and defines local.network from its outputs, and remove this one.
-  network = {
-    subnet_ids           = {}
-    private_dns_zone_ids = {}
-  }
 }
 
 resource "azurerm_resource_group" "main" {

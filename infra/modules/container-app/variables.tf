@@ -88,3 +88,9 @@ variable "role_assignments" {
   }))
   default = {}
 }
+
+variable "key_vault_secrets" {
+  description = "Environment variables read from Key Vault by the app's identity, by variable name: the secret's versionless URI (https://<vault>.vault.azure.net/secrets/<name>). Give the identity Key Vault Secrets User on each secret too (role_assignments)."
+  type        = map(string)
+  default     = {}
+}

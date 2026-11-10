@@ -1,5 +1,5 @@
-# The secrets that cannot be avoided: LiteLLM's admin key and its keys for the agents, and the gateway app's client
-# secret. The deployer writes them (Terraform and the scripts in src/); each workload reads only its own.
+# The secrets that cannot be avoided (e.g. a gateway's keys, an app registration's client secret). The deployer writes
+# them (Terraform and the project's scripts); each workload reads only its own.
 
 module "key_vault" {
   source                     = "./modules/key-vault"

@@ -1,4 +1,4 @@
-# Microsoft Foundry: the project the two agents live in, and the chat model they and LiteLLM use. Tracing goes to
+# Microsoft Foundry: the project the agents live in, and the chat model they and the gateways use. Tracing goes to
 # Application Insights. Defaults of the model settings: main.tfvars.json (and scripts/check-model-quota.sh).
 
 variable "model_name" {

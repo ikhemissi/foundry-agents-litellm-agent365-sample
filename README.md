@@ -132,7 +132,7 @@ The travel assistant refuses any request that does not carry the user's tokens (
 | [services/trips-mcp](services/trips-mcp) | The trips MCP server: each user's fictional trips and expenses; every tool call needs the user's token |
 | [services/chat-ui](services/chat-ui) | The chat (Next.js, CopilotKit, MSAL), in its Foundry mode: it calls the travel assistant as the user, keeps one agent session per chat and shows each tool call as it happens ([services/chat-ui/README.md](services/chat-ui/README.md#foundry-mode)) |
 | [src](src) | LiteLLM configuration, the expense policy agent's deployment, a command-line client ([src/README.md](src/README.md)) |
-| [infra](infra) | One Terraform root: one file per part of the architecture ([foundry.tf](infra/foundry.tf), [litellm-gateway.tf](infra/litellm-gateway.tf), [trips-mcp.tf](infra/trips-mcp.tf), …), each calling a module of [infra/modules](infra/modules) and wiring it to the others; the hooks and scripts azd runs before and after Terraform are in [infra/hooks](infra/hooks) and [infra/scripts](infra/scripts) |
+| [infra](infra) | One Terraform root: one file per part of the architecture ([foundry.tf](infra/foundry.tf), [litellm-gateway.tf](infra/litellm-gateway.tf), [trips-mcp.tf](infra/trips-mcp.tf), …), each calling a module of [infra/modules](infra/modules) and wiring it to the others; [connections.tf](infra/connections.tf) connects the chat to the travel assistant; the steps azd runs before and after Terraform are in [infra/hooks](infra/hooks) (one folder per event, run in name order) and [infra/scripts](infra/scripts) |
 
 ## Quick start
 
@@ -183,7 +183,7 @@ To share it, add people to the Entra group *Contoso travel assistant users (<env
 az ad group member add --group "$(azd env get-value CHAT_USERS_GROUP_ID)" --member-id <user object id>
 ```
 
-Only the group's members can sign in to the chat ([chat-ui.tf](infra/chat-ui.tf)). The group has the Foundry Agent Consumer role on the project, which lets its members call the agents with their own token ([agents.tf](infra/agents.tf)). A new member can use the chat after a few minutes, once the role applies to them.
+Only the group's members can sign in to the chat ([chat-ui.tf](infra/chat-ui.tf)). The group has the Foundry Agent Consumer role on the project, which lets its members call the agents with their own token ([connections.tf](infra/connections.tf)). A new member can use the chat after a few minutes, once the role applies to them.
 
 To try it without the chat:
 
