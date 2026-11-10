@@ -1,4 +1,4 @@
-# Where the container apps run (the trips MCP server, LiteLLM, the chat UI).
+# Where the project's container apps run (gateways, MCP servers, UIs), with their logs in Log Analytics.
 
 module "container_apps_environment" {
   source                     = "./modules/container-apps-environment"

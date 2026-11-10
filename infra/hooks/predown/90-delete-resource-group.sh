@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# azd predown hook: delete the environment's resource group in a single operation before `terraform destroy`.
+# Deletes the environment's resource group in a single operation before `terraform destroy`.
 # Deleting the resource group removes every resource and its child resources (e.g. PostgreSQL's Entra administrators
 # and firewall rules) in one operation; Terraform then finds the resources gone and only cleans its state. Key Vaults,
 # Foundry (Cognitive Services) accounts and API Management instances of the group are purged, and their diagnostic

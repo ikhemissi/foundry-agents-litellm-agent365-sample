@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# azd postdeploy hook: after the first deployment of a service, its container app still listens on the placeholder
+# After the first deployment of a service, its container app still listens on the placeholder
 # image's port (80); provisioning once more switches it to the service's port and adds its health probe
 # (modules/container-app). Later deployments find every app on its port: nothing to do.
 set -euo pipefail

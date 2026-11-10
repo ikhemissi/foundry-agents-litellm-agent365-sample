@@ -68,29 +68,29 @@ services:
       # Images are built in the platform's registry: no local Docker needed to deploy.
       remoteBuild: true
 
-# Project-level hooks (infra/hooks/): what Terraform cannot do, before and after it runs.
+# Each event runs the steps of infra/hooks/<event>/ in name order (infra/hooks/run.sh): what Terraform cannot do.
 hooks:
   preprovision:
     posix:
       shell: sh
-      run: bash ./infra/hooks/preprovision.sh
+      run: bash ./infra/hooks/run.sh preprovision
       interactive: false
       continueOnError: false
   postprovision:
     posix:
       shell: sh
-      run: bash ./infra/hooks/postprovision.sh
+      run: bash ./infra/hooks/run.sh postprovision
       interactive: false
       continueOnError: false
   postdeploy:
     posix:
       shell: sh
-      run: bash ./infra/hooks/postdeploy.sh
+      run: bash ./infra/hooks/run.sh postdeploy
       interactive: false
       continueOnError: false
   predown:
     posix:
       shell: sh
-      run: bash ./infra/hooks/predown.sh
+      run: bash ./infra/hooks/run.sh predown
       interactive: false
       continueOnError: false

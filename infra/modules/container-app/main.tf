@@ -46,6 +46,16 @@ resource "azurerm_container_app" "main" {
     identity = var.registry_pull_identity_id
   }
 
+  # Secrets the app cannot avoid (e.g. a gateway key), resolved from Key Vault by the app's identity.
+  dynamic "secret" {
+    for_each = var.key_vault_secrets
+    content {
+      name                = lower(replace(secret.key, "_", "-"))
+      key_vault_secret_id = secret.value
+      identity            = azurerm_user_assigned_identity.app.id
+    }
+  }
+
   ingress {
     external_enabled = var.external
     target_port      = local.image_deployed ? var.port : 80
@@ -76,6 +86,14 @@ resource "azurerm_container_app" "main" {
         content {
           name  = env.key
           value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = var.key_vault_secrets
+        content {
+          name        = env.key
+          secret_name = lower(replace(env.key, "_", "-"))
         }
       }
 

@@ -1,5 +1,5 @@
-# PostgreSQL for LiteLLM's state (keys, MCP servers, guardrails, spend logs), with Entra authentication only. In
-# development, the deploying user is the server's Entra administrator: the postprovision hook gives LiteLLM's identity
+# PostgreSQL with Entra authentication only, for the state of the parts that need a database (e.g. a gateway). In
+# development, the deploying user is the server's Entra administrator: a postprovision step gives a workload's identity
 # its role (scripts/postgres-grant-identity.sh), and scripts/psql.sh opens a session.
 
 variable "postgres_sku" {

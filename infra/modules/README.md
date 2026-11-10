@@ -19,7 +19,7 @@ Every module that can be reached privately takes the same optional inputs:
 - `private_endpoint_subnet_id`: a subnet for private endpoints. `null` (the default) means no private endpoint.
 - `private_dns_zone_ids`: the network module's `private_dns_zone_ids` output.
 
-This sample doesn't use a virtual network (see `local.network` in [main.tf](../main.tf)).
+This sample doesn't use a virtual network (see `local.network` in [network.tf](../network.tf)).
 
 ## Tests
 

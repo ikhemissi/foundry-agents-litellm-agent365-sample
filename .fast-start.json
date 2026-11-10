@@ -1,17 +1,24 @@
 {
   "composition": "spike",
   "source": {
-    "commit": "06552df7d40ab055414e2d77cb4024072544b076",
-    "describe": "v0.2.0-29-g06552df",
+    "commit": "71b723112858f57b809496e348074bf68e804211",
+    "describe": "v0.2.0-56-g71b7231",
     "dirty": false
   },
   "generated_at": "2026-11-07T09:09:00+00:00",
   "blocks": [
-    "azure-platform",
-    "foundry-model",
+    "azure-root",
+    "monitoring",
+    "container-apps-environment",
+    "key-vault",
+    "foundry",
     "postgres",
     "litellm-gateway",
-    "chat-ui"
+    "container-registry",
+    "chat-ui",
+    "gateway-app",
+    "trips-mcp",
+    "foundry-agents"
   ],
   "answers": {
     "project_name": "foundry-agents-litellm-agent365-sample",
@@ -21,10 +28,23 @@
     "azure_stack": false,
     "litellm_gateway": true,
     "apim_gateway": false,
-    "notes_mcp": true,
+    "notes_mcp": false,
     "chat_ui": true,
     "environment": "fa-litellm-a365",
     "location": "francecentral",
-    "author": "Iheb Khemissi"
-  }
+    "author": "Iheb Khemissi",
+    "foundry_agents": true
+  },
+  "modules": [
+    "monitoring",
+    "container-apps-environment",
+    "key-vault",
+    "foundry-project",
+    "postgres",
+    "litellm-gateway",
+    "container-registry",
+    "container-app",
+    "storage-account",
+    "network"
+  ]
 }

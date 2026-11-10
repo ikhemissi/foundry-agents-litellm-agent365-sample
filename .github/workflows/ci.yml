@@ -113,4 +113,4 @@ jobs:
             echo "::endgroup::"
           done
       - name: Shell scripts
-        run: shellcheck -x infra/hooks/*.sh infra/scripts/*.sh
+        run: shellcheck -x infra/hooks/run.sh infra/hooks/*/*.sh infra/scripts/*.sh

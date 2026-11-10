@@ -1,6 +1,6 @@
-# LiteLLM, the AI gateway every model, MCP and A2A call goes through. Terraform creates the gateway; the postprovision
-# hook gives its identity a database role, then configures it through its admin API (src/configure_gateway.py: the
-# trips MCP server, the expense policy agent, one key per agent, the Agent 365 guardrail).
+# LiteLLM, the AI gateway every model, MCP and A2A call goes through. Terraform creates the gateway; a postprovision
+# step gives its identity a database role (hooks/postprovision/10-litellm-database-role.sh); the project's later steps
+# configure it through its admin API (MCP servers, A2A agents, keys, guardrails).
 
 variable "litellm_image" {
   description = "LiteLLM image, pinned by digest (LITELLM_IMAGE). Empty: the version tested with the module."
