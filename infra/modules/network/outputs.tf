@@ -11,3 +11,8 @@ output "private_dns_zone_ids" {
   description = "Private DNS zone ids by zone name."
   value       = { for name, zone in azurerm_private_dns_zone.main : name => zone.id }
 }
+
+output "subnet_address_prefixes" {
+  description = "Subnet address prefixes by subnet name, known at plan time (e.g. for a network security group rule)."
+  value       = { for name, subnet in var.subnets : name => subnet.address_prefix }
+}

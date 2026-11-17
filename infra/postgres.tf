@@ -17,15 +17,14 @@ data "http" "deployer_ip" {
 }
 
 module "postgres" {
-  source                     = "./modules/postgres"
-  name                       = "psql-${var.environment_name}-${local.token}"
-  resource_group_name        = azurerm_resource_group.main.name
-  location                   = var.location
-  tags                       = local.tags
-  sku_name                   = var.postgres_sku
-  client_ip_address          = chomp(data.http.deployer_ip.response_body)
-  private_endpoint_subnet_id = lookup(local.network.subnet_ids, "private-endpoints", null)
-  private_dns_zone_ids       = local.network.private_dns_zone_ids
+  source              = "./modules/postgres"
+  name                = "psql-${var.environment_name}-${local.token}"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = var.location
+  tags                = local.tags
+  sku_name            = var.postgres_sku
+  client_ip_address   = chomp(data.http.deployer_ip.response_body)
+  private_endpoint    = local.private_endpoint
 
   administrator = {
     object_id      = data.azurerm_client_config.current.object_id
