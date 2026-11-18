@@ -21,10 +21,11 @@ variable "address_space" {
 }
 
 variable "subnets" {
-  description = "Subnets by name: their address range, and the service they are delegated to (e.g. Microsoft.App/environments), if any."
+  description = "Subnets by name: their address range, the service they are delegated to (e.g. Microsoft.App/environments), if any, and whether their VMs get default outbound access (false: a private subnet, whose VMs need an explicit outbound method such as a NAT Gateway; null: the provider's default)."
   type = map(object({
-    address_prefix = string
-    delegation     = optional(string)
+    address_prefix          = string
+    delegation              = optional(string)
+    default_outbound_access = optional(bool)
   }))
 }
 

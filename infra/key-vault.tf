@@ -8,8 +8,7 @@ module "key_vault" {
   location                   = var.location
   tags                       = local.tags
   secrets_officer_object_ids = [data.azurerm_client_config.current.object_id]
-  private_endpoint_subnet_id = lookup(local.network.subnet_ids, "private-endpoints", null)
-  private_dns_zone_ids       = local.network.private_dns_zone_ids
+  private_endpoint           = local.private_endpoint
 }
 
 output "KEY_VAULT_ID" { value = module.key_vault.id }

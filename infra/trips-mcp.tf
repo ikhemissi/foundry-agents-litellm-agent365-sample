@@ -9,14 +9,13 @@ variable "trips_mcp_image" {
 }
 
 module "trips_storage" {
-  source                     = "./modules/storage-account"
-  name                       = "sttrips${local.token}"
-  resource_group_name        = azurerm_resource_group.main.name
-  location                   = var.location
-  tags                       = local.tags
-  private_endpoint_subnet_id = lookup(local.network.subnet_ids, "private-endpoints", null)
-  private_endpoint_services  = ["table"]
-  private_dns_zone_ids       = local.network.private_dns_zone_ids
+  source                    = "./modules/storage-account"
+  name                      = "sttrips${local.token}"
+  resource_group_name       = azurerm_resource_group.main.name
+  location                  = var.location
+  tags                      = local.tags
+  private_endpoint          = local.private_endpoint
+  private_endpoint_services = ["table"]
 }
 
 module "trips_mcp" {
